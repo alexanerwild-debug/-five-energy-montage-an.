@@ -184,6 +184,7 @@ async function wfAdd(rid,type){
  await ref.set({roomId:rid,type,createdBy:authUid(),createdByEmail:authEmail(),
    createdAt:firebase.firestore.FieldValue.serverTimestamp(),before:null,after:null,note:"",
    clarify:false,clarifyNote:"",clarifyResolved:false,resolution:""});
+ renderWorkflow("before",rid);
 }
 async function wfRemove(rid,iid){
  let r=p().rooms.find(x=>x.id===rid),it=r&&wfItems(r).find(x=>x.id===iid);if(!it)return;
@@ -265,11 +266,13 @@ async function cloudBootstrap(){
  });
  if(cloudInstUnsub)cloudInstUnsub();
  cloudInstUnsub=fsInst().onSnapshot(q=>{
+   let openRoom=document.querySelector("#aufnahmeWorkflow .roomGroup[open] .wfRoom");
+   let keepRid=openRoom?openRoom.id.replace("wf_",""):null;
    let byRoom={};
    q.docs.forEach(d=>{let x={id:d.id,...d.data()};(byRoom[x.roomId]||(byRoom[x.roomId]=[])).push(x)});
    p().rooms.forEach(r=>r.installations=byRoom[r.id]||[]);
    localStorage.setItem("five_energy_projects_v1",JSON.stringify(state.projects));
-   renderWorkflow("before");renderWorkflow("after");renderClarificationDashboard();
+   renderWorkflow("before",keepRid);renderWorkflow("after");renderClarificationDashboard();
  });
  cloudReady=true;
 }
