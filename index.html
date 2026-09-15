@@ -25,6 +25,10 @@
 .smallDanger{background:#fff;color:#a42626;border:1px solid #d8a0a0;padding:7px 10px}
 .doneBadge{background:#e8f4e2;color:#2f6f19;padding:5px 9px;border-radius:999px;font-weight:700}
 
+
+/* V12: workflow pages are true standalone menu pages */
+#aufnahme,#montage{display:none}
+#aufnahme.active,#montage.active{display:block}
 </style></head><body>
 <header><div class="brand">FIV.Energy</div><div class="sub">Montage & Fotodokumentation</div></header>
 <div class="projectbar"><select id="projectSelect"></select><button class="btn green" style="width:auto;margin:0;padding:11px" onclick="newProject()">+ Projekt</button></div>
@@ -183,13 +187,17 @@ function v11Save(){
 function v11Add(roomId, type){
  if(!type)return;
  const r=v11Rooms().find(x=>x.id===roomId); if(!r)return;
- v11Ensure(r).push({id:"i_"+Date.now()+"_"+Math.random().toString(36).slice(2,7),type,before:null,after:null,clarify:false,clarifyNote:"",clarifyResolved:false,resolution:"",createdAt:new Date().toISOString()});
- v11Save(); renderWorkflow("aufnahme");
+ v11Ensure(r).push({id:"i_"+Date.now()+"_"+Math.random().toString(36).slice(2,7),type,before:null,after:null,note:"",clarify:false,clarifyNote:"",clarifyResolved:false,resolution:"",createdAt:new Date().toISOString()});
+ v11Save(); renderWorkflow("aufnahme", roomId);
 }
 function v11Remove(roomId,iid){
  const r=v11Rooms().find(x=>x.id===roomId); if(!r)return;
  r.installations=v11Ensure(r).filter(x=>x.id!==iid);
- v11Save(); renderWorkflow("aufnahme"); renderWorkflow("montage");
+ v11Save(); renderWorkflow("aufnahme", roomId); renderWorkflow("montage", roomId);
+}
+function v11ItemNote(roomId,iid,val){
+ const r=v11Rooms().find(x=>x.id===roomId), it=r&&v11Ensure(r).find(x=>x.id===iid); if(!it)return;
+ it.note=val; v11Save();
 }
 function v11Clarify(roomId,iid,on){
  const r=v11Rooms().find(x=>x.id===roomId); const it=r&&v11Ensure(r).find(x=>x.id===iid); if(!it)return;
@@ -245,7 +253,7 @@ function v11RoomCard(r,mode){
  const list=items.map((it,n)=>`<div class="instItem">
    <div class="instHead"><div class="instTitle">${v11Esc(it.type)} <span class="small">#${n+1}</span></div>
    ${mode==="aufnahme"?`<button class="smallDanger" onclick="v11Remove('${r.id}','${it.id}')">Entfernen</button>`:""}</div>
-   ${mode==="aufnahme"?v11Photo(it,"before",r.id):`<div class="photoPair"><div><div class="small"><b>VORHER</b></div>${v11Photo(it,"before",r.id)}</div><div><div class="small"><b>NACHHER</b></div>${v11Photo(it,"after",r.id)}</div></div>`}
+   ${mode==="aufnahme"?`${v11Photo(it,"before",r.id)}<textarea style="width:100%;min-height:65px;margin-top:10px" placeholder="Notiz zur Einbausituation / Besonderheiten" oninput="v11ItemNote('${r.id}','${it.id}',this.value)">${v11Esc(it.note||"")}</textarea>`:`${it.note?`<div class="card" style="margin:10px 0;padding:10px"><b>Notiz aus der Aufnahme</b><div>${v11Esc(it.note)}</div></div>`:""}<div class="photoPair"><div><div class="small"><b>VORHER · EINBAUSITUATION</b></div>${v11Photo(it,"before",r.id)}</div><div><div class="small"><b>NACHHER · MONTAGE</b></div>${v11Photo(it,"after",r.id)}</div></div>`}
    <label style="display:block;margin-top:10px"><input type="checkbox" ${it.clarify?"checked":""} onchange="v11Clarify('${r.id}','${it.id}',this.checked)"> ⚠️ Klärung erforderlich</label>
    ${v11ClarifyUI(r,it)}
  </div>`).join("");
@@ -257,14 +265,17 @@ function v11RoomCard(r,mode){
  ${items.length?list:`<div class="small" style="margin-top:12px">Noch keine Komponenten für diesen Raum aufgenommen.</div>`}
  </div>`;
 }
-function renderWorkflow(mode){
+function renderWorkflow(mode, keepRoomId){
  const el=document.getElementById(mode==="aufnahme"?"aufnahmeWorkflow":"montageWorkflow"); if(!el)return;
- const rr=v11Rooms();
- const floors=[...new Set(rr.map(x=>x.floor))];
+ const oldOpen=[...el.querySelectorAll("details[open]")].map(d=>d.dataset.floor);
+ const rr=v11Rooms(), floors=[...new Set(rr.map(x=>x.floor))];
+ const keepRoom=keepRoomId&&rr.find(x=>x.id===keepRoomId);
  el.innerHTML=floors.map(f=>{
    const rooms=rr.filter(x=>x.floor===f);
-   return `<details><summary><b>${v11Esc(typeof floorLabel==="function"?floorLabel(f):f)}</b> · ${rooms.length} Räume</summary>${rooms.map(r=>v11RoomCard(r,mode)).join("")}</details>`;
+   const open=oldOpen.includes(String(f))||(keepRoom&&String(keepRoom.floor)===String(f));
+   return `<details data-floor="${v11Esc(f)}" ${open?"open":""}><summary><b>${v11Esc(typeof floorLabel==="function"?floorLabel(f):f)}</b> · ${rooms.length} Räume</summary>${rooms.map(r=>v11RoomCard(r,mode)).join("")}</details>`;
  }).join("");
+ if(keepRoomId)setTimeout(()=>document.getElementById("wf_"+keepRoomId)?.scrollIntoView({block:"center"}),30);
  renderClarifications();
 }
 function renderClarifications(){
