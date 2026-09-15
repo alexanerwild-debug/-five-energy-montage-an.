@@ -7,45 +7,38 @@
 .appShell{display:grid;grid-template-columns:210px 1fr;max-width:1180px;margin:auto}.side{background:#fff;border-right:1px solid var(--line);min-height:calc(100vh - 92px);padding:14px 10px;position:sticky;top:0;height:100vh}.side button{display:block;width:100%;text-align:left;border:0;background:transparent;padding:12px;border-radius:10px;font-weight:800;color:#35404a;margin:2px 0}.side button.active{background:#e7f3dd;color:#356c16}.side .navTitle{font-size:12px;color:#8a9299;padding:10px 12px 4px;text-transform:uppercase}.componentGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.componentGuide{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff}.componentGuide img{width:100%;height:190px;object-fit:contain;background:#f8f9fa}.componentGuide .pad{padding:13px}.componentGuide ul{padding-left:20px;line-height:1.45}.prepGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.prepItem{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;font-weight:700}.critical{background:#eaf6e3;border-left:5px solid var(--green2);padding:12px;border-radius:10px;margin:10px 0}.mobileMenu{display:none}
 @media(max-width:760px){.appShell{display:block}.side{position:fixed;z-index:30;left:-260px;top:0;width:245px;height:100vh;transition:.2s;box-shadow:4px 0 20px #0003}.side.open{left:0}.mobileMenu{display:inline-block;position:fixed;right:14px;bottom:18px;z-index:31;border:0;border-radius:50%;width:54px;height:54px;background:var(--green2);color:#fff;font-size:25px;box-shadow:0 3px 12px #0004}.componentGrid,.prepGrid{grid-template-columns:1fr}main{max-width:820px}.projectbar{padding-left:14px}}
 
-/* V11 Aufnahme/Montage workflow */
-.phaseTabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 16px}
-.phaseTabs button{flex:1;min-width:145px}
-.addCompRow{display:flex;gap:8px;align-items:center;margin:12px 0}
-.addCompRow select{flex:1}
-.instItem{border:1px solid #dbe3e8;border-radius:18px;padding:14px;margin:12px 0;background:#fff}
-.instHead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
-.instTitle{font-weight:800;font-size:18px}
-.photoPair{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
-.photoBox{border:1px dashed #aebdca;border-radius:14px;padding:10px;min-height:145px;text-align:center;background:#fafcfd}
-.photoBox img{width:100%;max-height:210px;object-fit:cover;border-radius:10px}
-.camBtn{font-size:28px;display:flex;align-items:center;justify-content:center;min-height:86px;cursor:pointer}
-.clarifyBox{margin-top:10px;padding:10px;border-radius:12px;background:#fff7df;border:1px solid #e5c35b}
-.clarifyBox textarea{width:100%;min-height:72px}
-.clarifyCard{border-left:5px solid #d89c00}
-.smallDanger{background:#fff;color:#a42626;border:1px solid #d8a0a0;padding:7px 10px}
-.doneBadge{background:#e8f4e2;color:#2f6f19;padding:5px 9px;border-radius:999px;font-weight:700}
-
-
-/* V12: workflow pages are true standalone menu pages */
-#aufnahme,#montage{display:none}
-#aufnahme.active,#montage.active{display:block}
-
-/* V13: legacy room/component forms are retired */
-#rooms,#bestand,#bestandsaufnahme,#legacyMontage{display:none!important}
-
-.roomGroup{margin:8px 0 8px 12px;border:1px solid #dbe3e8;border-radius:14px;background:#fff}
-.roomGroup>summary{padding:12px;cursor:pointer}
-.roomGroup>.card{box-shadow:none;border:0;margin:0}
-.floorGroup>summary{padding:8px 0;cursor:pointer;font-size:18px}
-.photoPair{align-items:start}
-.photoBox input[type=file]{display:none}
+/* V14 clean field workflow */
+.floorGroup{margin:10px 0}.floorGroup>summary{font-size:20px;font-weight:800;padding:10px 2px;cursor:pointer}
+.roomGroup{margin:8px 0 8px 10px;border:1px solid #dce3e8;border-radius:15px;background:#fff}
+.roomGroup>summary{padding:13px;font-weight:800;cursor:pointer}
+.wfRoom{padding:12px;border-top:1px solid #edf0f2}
+.addComp{display:flex;gap:8px;align-items:center}.addComp select{flex:1}
+.wfItem{border:1px solid #dce3e8;border-radius:15px;padding:12px;margin-top:12px}
+.wfHead{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}.wfTitle{font-weight:800}
+.wfPhotoPair{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.wfPhoto{border:1px dashed #afbdc8;border-radius:13px;padding:8px;text-align:center;min-height:135px;background:#fbfcfd}
+.wfPhoto img{width:100%;max-height:220px;object-fit:cover;border-radius:9px}
+.wfCamera{display:flex;align-items:center;justify-content:center;min-height:85px;font-size:32px;cursor:pointer}
+.wfCamera input{display:none}.wfNote{width:100%;min-height:64px;margin-top:9px}
+.wfClarify{background:#fff6dd;border:1px solid #dfbd57;border-radius:12px;padding:10px;margin-top:10px}
+.wfClarify textarea{width:100%;min-height:64px}
+.wfRemove{background:white!important;color:#9b2929!important;border:1px solid #d8a4a4!important;padding:6px 9px!important;margin:0!important}
+.wfDone{background:#e7f3e2;color:#36741e;padding:5px 9px;border-radius:999px;font-weight:800}
 </style></head><body>
 <header><div class="brand">FIV.Energy</div><div class="sub">Montage & Fotodokumentation</div></header>
 <div class="projectbar"><select id="projectSelect"></select><button class="btn green" style="width:auto;margin:0;padding:11px" onclick="newProject()">+ Projekt</button></div>
-<button class="mobileMenu" onclick="document.querySelector('.side').classList.toggle('open')">☰</button><div class="appShell"><aside class="side"><div class="navTitle">FIV.Energy</div><button data-tab="dashboard" class="active">⌂ Übersicht</button><button data-tab="projekte">▣ Projekte & Archiv</button><button data-tab="bestand">▤ Räume / Bestand</button><button data-tab="plaene">⌑ Pläne</button><button data-tab="montage">✓ Montage</button><button data-tab="teams">♙ Teams</button><div class="navTitle">Wissen & Vorbereitung</div><button data-tab="komponenten">◇ Komponenten</button><button data-tab="arbeitsvorbereitung">🧰 Arbeitsvorbereitung</button><button data-tab="hilfe">▢ Montageanleitungen</button></aside><main>
+<button class="mobileMenu" onclick="document.querySelector('.side').classList.toggle('open')">☰</button><div class="appShell"><aside class="side"><div class="navTitle">FIV.Energy</div><button data-tab="dashboard" class="active">⌂ Übersicht</button><button data-tab="projekte">▣ Projekte & Archiv</button><button data-tab="bestand">▤ Aufnahme Räume & Bestand</button><button data-tab="plaene">⌑ Pläne</button><button data-tab="montage">✓ Montage</button><button data-tab="teams">♙ Teams</button><div class="navTitle">Wissen & Vorbereitung</div><button data-tab="komponenten">◇ Komponenten</button><button data-tab="arbeitsvorbereitung">🧰 Arbeitsvorbereitung</button><button data-tab="hilfe">▢ Montageanleitungen</button></aside><main>
 <section id="dashboard" class="section active"><h1 id="dashTitle">Dashboard</h1><div class="grid" id="stats"></div><div class="card"><h2>Fortschritt</h2><div class="small" id="progText"></div><div class="progress"><i id="progBar"></i></div></div><div class="card"><h2>Materialbedarf gesamt</h2><div id="totals"></div></div><div class="card"><h2>Material nach Etage</h2><div id="floors"></div></div></section>
-<section id="bestand" class="section"><h1>Bestandsaufnahme</h1><div class="card"><h2>Raum anlegen</h2><div class="row"><div><label>Etage</label><select id="floor"></select></div><div><label>Raumnummer</label><select id="number"></select></div></div><label>Raumname (optional)</label><input id="name" placeholder="z. B. Büro, Besprechung"><label>Team</label><select id="team"></select><label>Notiz / Einbausituation</label><textarea id="note" placeholder="Besonderheiten, Einbauort …"></textarea><button class="btn green" id="addRoom">+ Raum anlegen</button></div><div id="bestandRooms"></div></section>
-<section id="montage" class="section"><h1>Montage</h1><div class="card small">Nach der Montage je Komponente ein Nachher-Foto aufnehmen. Bei Abweichungen nicht improvisieren: Foto + Notiz hinterlegen und Projektleitung kontaktieren.</div><div id="montageRooms"></div></section>
+<section id="bestand" class="section">
+<h1>Aufnahme Räume & Bestand</h1>
+<div class="card small">Etage und Raum öffnen. Über „Komponente auswählen“ wird jede Komponente einzeln hinzugefügt. Dazu Vorher-Foto und Notiz erfassen.</div>
+<div id="aufnahmeWorkflow"></div>
+</section>
+<section id="montage" class="section">
+<h1>Montage</h1>
+<div class="card small">Nur die bei der Aufnahme erfassten Komponenten werden angezeigt. Links die Einbausituation vorher, rechts das Foto nach der Montage.</div>
+<div id="montageWorkflow"></div>
+</section>
 <section id="teams" class="section"><h1>Teams</h1><div class="card"><label>Neues Team / Monteur</label><div class="row"><input id="newTeam" placeholder="Name"><button class="btn green" id="addTeam" style="margin:0">Hinzufügen</button></div></div><div class="card" id="teamList"></div></section>
 <section id="komponenten" class="section"><h1>Komponenten</h1><div class="card small">Zentrale, projektübergreifende Komponentenbibliothek. Die bebilderten Montagehinweise findest du unter „Montageanleitungen“.</div><div class="componentGrid">
 <div class="componentGuide"><img src="data:image/jpeg;base64,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"><div class="pad"><b>HmIP-eTRV-C-2</b><div class="small">Heizkörperthermostat kompakt 2 · 2 × AA/LR6</div></div></div>
@@ -76,17 +69,6 @@
 <details class="card helpCard"><summary>CO₂-Melder / weitere Komponenten</summary><ul><li>Montageort nach Projektvorgabe festlegen und Vorher-Foto aufnehmen.</li><li>Nicht unmittelbar in Zugluft, hinter Möbeln oder an ungeeigneten Wärme-/Kältequellen montieren.</li><li>Gerät gerade und fest montieren; Stromversorgung/Batterien gemäß konkretem Modell prüfen.</li><li>Nach Inbetriebnahme Funktion prüfen und Nachher-Foto dokumentieren.</li></ul></details>
 </section>
 <section id="projekte" class="section"><h1>Projekte</h1><div class="card"><h2>Aktives Projekt</h2><div id="projectInfo"></div><div class="topActions"><button class="btn green" onclick="renameProject()">Projekt umbenennen</button><button class="btn amber" onclick="archiveCurrent()">Abschließen & archivieren</button></div></div><div class="card"><h2>Archiv</h2><div id="archiveList"></div></div></section>
-
-<section id="aufnahme" class="page">
-  <h2>Aufnahme Räume & Bestand</h2>
-  <div class="card"><b>Bestandsaufnahme</b><div class="small">Raum wählen, benötigte Komponenten hinzufügen und Einbauort fotografieren. Jede Auswahl entspricht genau einer Komponente.</div></div>
-  <div id="aufnahmeWorkflow"></div>
-</section>
-<section id="montage" class="page">
-  <h2>Montage</h2>
-  <div class="card"><b>Vorher / Nachher</b><div class="small">Links das Foto aus der Aufnahme, rechts das Foto nach der Montage.</div></div>
-  <div id="montageWorkflow"></div>
-</section>
 </main></div>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script>
@@ -112,16 +94,14 @@ function seedPlanRooms(){
 }
 
 function persist(){localStorage.setItem("fiv_app_v4",JSON.stringify(state))}function p(){return state.projects.find(x=>x.id===state.activeId)||state.projects[0]}function emptyComps(){return Object.fromEntries(C.map(x=>[x,0]))}
-$("floor").innerHTML=`<option value="-1">KG</option><option value="0">EG</option>`+Array.from({length:7},(_,i)=>`<option value="${i+1}">${i+1}. OG</option>`).join("");$("number").innerHTML=Array.from({length:100},(_,i)=>`<option>${String(i+1).padStart(3,"0")}</option>`).join("");
 document.querySelectorAll(".side button[data-tab]").forEach(b=>b.onclick=()=>{document.querySelectorAll(".section,.side button[data-tab]").forEach(x=>x.classList.remove("active"));$(b.dataset.tab).classList.add("active");b.classList.add("active");document.querySelector(".side").classList.remove("open");render()});
 function newProject(){let name=prompt("Name des neuen Projekts:");if(!name)return;let id="p"+Date.now();state.projects.push({id,name:name.trim(),status:"active",created:new Date().toISOString(),rooms:[],teams:["Alex"]});state.activeId=id;persist();render()}
 function renameProject(){let x=p(),n=prompt("Projektname:",x.name);if(n){x.name=n.trim();persist();render()}}
 function archiveCurrent(){let x=p();if(!confirm(`Projekt „${x.name}“ abschließen und archivieren? Alle Räume, Daten und Fotos bleiben erhalten.`))return;x.status="archived";x.archivedAt=new Date().toISOString();let next=state.projects.find(q=>q.status==="active"&&q.id!==x.id);if(next)state.activeId=next.id;persist();render();alert("Projekt wurde archiviert und bleibt vollständig aufrufbar.")}
 function reactivate(id){let x=state.projects.find(q=>q.id===id);x.status="active";delete x.archivedAt;state.activeId=id;persist();render()}
 $("projectSelect").onchange=e=>{state.activeId=e.target.value;persist();render()};
-$("addRoom").onclick=()=>{let x=p();if(x.status==="archived")return alert("Archivierte Projekte sind schreibgeschützt. Bitte zuerst reaktivieren.");x.rooms.push({id:Date.now().toString(),floor:+$("floor").value,num:$("number").value,name:$("name").value.trim(),team:$("team").value,note:$("note").value.trim(),components:emptyComps(),before:{},after:{},done:false,clarify:false});$("name").value="";$("note").value="";persist();render()};
 $("addTeam").onclick=()=>{let x=p(),v=$("newTeam").value.trim();if(v&&!x.teams.includes(v)){x.teams.push(v);$("newTeam").value="";persist();render()}};
-function roomTitle(r){return `${floorLabel(r.floor)} · ${r.num}${r.name?" – "+esc(r.name):""}${r.area?" · "+esc(r.area):""}`}function qty(id,c,v){let r=p().rooms.find(x=>x.id===id);r.components[c]=Math.max(0,+v||0);persist();renderDash();renderPlans()}
+function roomTitle(r){return `${floorLabel(r.floor)} · ${r.num}${r.name?" – "+esc(r.name):""}${r.area?" · "+esc(r.area):""}`}function qty(id,c,v){let r=p().rooms.find(x=>x.id===id);r.components[c]=Math.max(0,+v||0);persist();renderDash();renderPlans();renderWorkflow("before");renderWorkflow("after");renderClarificationDashboard()}
 function deleteRoom(id){let r=p().rooms.find(x=>x.id===id);if(confirm(`${roomTitle(r)} wirklich löschen? Raumdaten werden entfernt. Bereits in Firebase gespeicherte Originalfotos werden aus Sicherheitsgründen nicht automatisch gelöscht.`)){p().rooms=p().rooms.filter(x=>x.id!==id);persist();render()}}
 function toggleClarify(id){let r=p().rooms.find(x=>x.id===id);r.clarify=!r.clarify;persist();render()}function toggleDone(id){let r=p().rooms.find(x=>x.id===id);r.done=!r.done;persist();render()}
 async function photo(ev,id,c,phase){const f=ev.target.files?.[0];if(!f)return;const img=new Image(),url=URL.createObjectURL(f);img.onload=()=>{const max=1600,s=Math.min(1,max/Math.max(img.width,img.height)),cv=document.createElement("canvas");cv.width=Math.round(img.width*s);cv.height=Math.round(img.height*s);cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);cv.toBlob(async blob=>{let r=p().rooms.find(x=>x.id===id),fallback=cv.toDataURL("image/jpeg",.72),rec={url:fallback,ts:new Date().toISOString()};if(storage){try{let path=`projects/${p().id}/${id}/${phase}/${Date.now()}.jpg`,ref=storage.ref(path);await ref.put(blob);rec.url=await ref.getDownloadURL();rec.path=path}catch(e){console.log(e)}}r[phase][c]=rec;persist();render();},"image/jpeg",.72);URL.revokeObjectURL(url)};img.src=url}
@@ -171,146 +151,59 @@ function renderPlans(){
  </div>`).join("");
 }
 
-function render(){let x=p();$("projectSelect").innerHTML=state.projects.map(q=>`<option value="${q.id}" ${q.id===x.id?"selected":""}>${q.status==="archived"?"📦 ":""}${esc(q.name)}</option>`).join("");$("team").innerHTML=x.teams.map(t=>`<option>${esc(t)}</option>`).join("");$("teamList").innerHTML=x.teams.map(t=>`<div style="padding:9px 0;border-bottom:1px solid #eee">${esc(t)}</div>`).join("");let sorted=[...x.rooms].sort((a,b)=>a.floor-b.floor||a.num.localeCompare(b.num));$("bestandRooms").innerHTML=sorted.length?sorted.map(r=>roomHtml(r,"before")).join(""):"<div class='card small'>Noch keine Räume angelegt.</div>";$("montageRooms").innerHTML=sorted.length?sorted.map(r=>roomHtml(r,"after")).join(""):"<div class='card small'>Noch keine Räume vorhanden.</div>";$("projectInfo").innerHTML=`<b>${esc(x.name)}</b><div class="small">Status: ${x.status==="archived"?"Archiviert":"Aktiv"}</div>${x.status==="archived"?`<button class="btn green" onclick="reactivate('${x.id}')">Projekt reaktivieren</button>`:""}`;let ar=state.projects.filter(q=>q.status==="archived");$("archiveList").innerHTML=ar.length?ar.map(q=>`<div class="room archive"><b>📦 ${esc(q.name)}</b><div class="small">${q.rooms.length} Räume · archiviert ${q.archivedAt?new Date(q.archivedAt).toLocaleDateString("de-DE"):""}</div><button class="btn light" onclick="state.activeId='${q.id}';persist();render()">Archiv ansehen</button><button class="btn green" onclick="reactivate('${q.id}')">Reaktivieren</button></div>`).join(""):"<span class='small'>Noch keine archivierten Projekte.</span>";renderDash();renderPlans()}
+
+function wfEsc(x){return String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+function wfItems(r){if(!Array.isArray(r.installations))r.installations=[];return r.installations}
+function wfSave(){persist();renderDash();renderClarificationDashboard()}
+function wfAdd(rid,type){
+ if(!type)return;let r=p().rooms.find(x=>x.id===rid);if(!r)return;
+ wfItems(r).push({id:"cmp_"+Date.now()+"_"+Math.random().toString(36).slice(2,6),type,before:null,after:null,note:"",clarify:false,clarifyNote:"",clarifyResolved:false,resolution:""});
+ wfSave();renderWorkflow("before",rid);
+}
+function wfRemove(rid,iid){let r=p().rooms.find(x=>x.id===rid);if(!r)return;r.installations=wfItems(r).filter(x=>x.id!==iid);wfSave();renderWorkflow("before",rid)}
+function wfSet(rid,iid,key,val){let r=p().rooms.find(x=>x.id===rid),it=r&&wfItems(r).find(x=>x.id===iid);if(!it)return;it[key]=val;wfSave()}
+function wfPhotoInput(rid,iid,phase,input){
+ let f=input.files&&input.files[0];if(!f)return;let rd=new FileReader();
+ rd.onload=e=>{let im=new Image();im.onload=()=>{let sc=Math.min(1,1600/Math.max(im.width,im.height)),cv=document.createElement("canvas");
+ cv.width=Math.round(im.width*sc);cv.height=Math.round(im.height*sc);cv.getContext("2d").drawImage(im,0,0,cv.width,cv.height);
+ let r=p().rooms.find(x=>x.id===rid),it=r&&wfItems(r).find(x=>x.id===iid);if(!it)return;it[phase]=cv.toDataURL("image/jpeg",.72);it[phase+"At"]=new Date().toISOString();
+ wfSave();renderWorkflow(phase==="before"?"before":"after",rid)};im.src=e.target.result};rd.readAsDataURL(f)
+}
+function wfPhotoBox(r,it,phase){
+ let src=it[phase],lab=phase==="before"?"VORHER · EINBAUORT":"NACHHER · MONTAGE";
+ return `<div><div class="small"><b>${lab}</b></div><div class="wfPhoto">${src?`<img src="${src}">`:`<div class="small">${phase==="before"?"Noch kein Vorher-Foto":"Noch kein Nachher-Foto"}</div>`}<label class="wfCamera">📷<input type="file" accept="image/*" capture="environment" onchange="wfPhotoInput('${r.id}','${it.id}','${phase}',this)"></label></div></div>`
+}
+function wfClarify(r,it,mode){
+ return `<label style="display:block;margin-top:9px"><input type="checkbox" ${it.clarify?"checked":""} onchange="wfSet('${r.id}','${it.id}','clarify',this.checked);renderWorkflow('${mode}','${r.id}')"> ⚠️ Klärung erforderlich</label>
+ ${it.clarify?`<div class="wfClarify"><b>Was muss geklärt werden?</b><textarea placeholder="Problem / erforderliche Klärung" oninput="wfSet('${r.id}','${it.id}','clarifyNote',this.value)">${wfEsc(it.clarifyNote||"")}</textarea>
+ <label><input type="checkbox" ${it.clarifyResolved?"checked":""} onchange="wfSet('${r.id}','${it.id}','clarifyResolved',this.checked);renderWorkflow('${mode}','${r.id}')"> Klärung erledigt</label>
+ ${it.clarifyResolved?`<textarea placeholder="Lösung / Entscheidung" oninput="wfSet('${r.id}','${it.id}','resolution',this.value)">${wfEsc(it.resolution||"")}</textarea>`:""}</div>`:""}`
+}
+function wfItemHtml(r,it,n,mode){
+ let after=mode==="after";
+ return `<div class="wfItem"><div class="wfHead"><div class="wfTitle">${wfEsc(it.type)} <span class="small">#${n+1}</span></div>${!after?`<button class="wfRemove" onclick="wfRemove('${r.id}','${it.id}')">Entfernen</button>`:""}</div>
+ ${after?(it.note?`<div class="card" style="padding:9px;margin:9px 0"><b>Notiz aus der Aufnahme</b><div>${wfEsc(it.note)}</div></div>`:"")+`<div class="wfPhotoPair">${wfPhotoBox(r,it,"before")}${wfPhotoBox(r,it,"after")}</div>`:wfPhotoBox(r,it,"before")+`<textarea class="wfNote" placeholder="Notiz zur Einbausituation / Besonderheiten" oninput="wfSet('${r.id}','${it.id}','note',this.value)">${wfEsc(it.note||"")}</textarea>`}
+ ${wfClarify(r,it,mode)}</div>`
+}
+function wfRoomHtml(r,mode){
+ let items=wfItems(r),after=mode==="after",complete=items.length>0&&items.every(x=>x.after);
+ let opts=C.map(c=>`<option value="${wfEsc(c)}">${wfEsc(c)}</option>`).join("");
+ return `<div class="wfRoom" id="wf_${r.id}"><div class="wfHead"><div><b>${roomTitle(r)}</b><div class="small">${wfEsc(r.team||"")}${r.note?" · "+wfEsc(r.note):""}</div></div>${after&&complete?'<span class="wfDone">✓ fertig</span>':""}</div>
+ ${!after?`<div class="addComp"><select id="wfsel_${r.id}"><option value="">Komponente auswählen …</option>${opts}</select><button class="btn green" style="margin:0" onclick="let e=document.getElementById('wfsel_${r.id}');wfAdd('${r.id}',e.value)">+ Hinzufügen</button></div>`:""}
+ ${items.length?items.map((it,n)=>wfItemHtml(r,it,n,mode)).join(""):`<div class="small" style="padding:12px 0">Noch keine Komponenten aufgenommen.</div>`}</div>`
+}
+function renderWorkflow(mode,keepRid){
+ let el=$(mode==="before"?"aufnahmeWorkflow":"montageWorkflow");if(!el)return;
+ let old=[...el.querySelectorAll(".floorGroup[open]")].map(x=>x.dataset.f),rr=[...p().rooms].sort((a,b)=>a.floor-b.floor||String(a.num).localeCompare(String(b.num),"de",{numeric:true})),floors=[...new Set(rr.map(r=>r.floor))],kr=rr.find(r=>r.id===keepRid);
+ el.innerHTML=floors.map(f=>{let rs=rr.filter(r=>r.floor===f),fo=old.includes(String(f))||(kr&&kr.floor===f);
+ return `<details class="floorGroup" data-f="${f}" ${fo?"open":""}><summary>${floorLabel(f)} · ${rs.length} Räume</summary>${rs.map(r=>`<details class="roomGroup" ${r.id===keepRid?"open":""}><summary>${wfEsc(r.num)}${r.name?" · "+wfEsc(r.name):""} · ${wfItems(r).length} Komponenten</summary>${wfRoomHtml(r,mode)}</details>`).join("")}</details>`}).join("");
+ if(keepRid)setTimeout(()=>$("wf_"+keepRid)?.scrollIntoView({block:"center"}),20)
+}
+function renderClarificationDashboard(){
+ let host=$("clarificationDashboard");if(!host){host=document.createElement("div");host.id="clarificationDashboard";$("dashboard")?.appendChild(host)}
+ if(!host)return;let a=[];p().rooms.forEach(r=>wfItems(r).forEach(it=>{if(it.clarify&&!it.clarifyResolved)a.push({r,it})}));
+ host.innerHTML=`<div class="card"><h2>⚠️ Klärung erforderlich · ${a.length}</h2>${a.length?a.map(({r,it})=>`<div style="padding:10px 0;border-bottom:1px solid #eee"><b>${floorLabel(r.floor)} · ${wfEsc(r.num)} · ${wfEsc(it.type)}</b>${it.before?`<div><img src="${it.before}" style="width:150px;max-height:120px;object-fit:cover;border-radius:8px;margin-top:6px"></div>`:""}<div>${wfEsc(it.clarifyNote||"Noch keine Notiz.")}</div></div>`).join(""):'<span class="small">Keine offenen Klärungen.</span>'}</div>`
+}
+function render(){let x=p();$("projectSelect").innerHTML=state.projects.map(q=>`<option value="${q.id}" ${q.id===x.id?"selected":""}>${q.status==="archived"?"📦 ":""}${esc(q.name)}</option>`).join("");$("teamList").innerHTML=x.teams.map(t=>`<div style="padding:9px 0;border-bottom:1px solid #eee">${esc(t)}</div>`).join("");let sorted=[...x.rooms].sort((a,b)=>a.floor-b.floor||a.num.localeCompare(b.num));$("projectInfo").innerHTML=`<b>${esc(x.name)}</b><div class="small">Status: ${x.status==="archived"?"Archiviert":"Aktiv"}</div>${x.status==="archived"?`<button class="btn green" onclick="reactivate('${x.id}')">Projekt reaktivieren</button>`:""}`;let ar=state.projects.filter(q=>q.status==="archived");$("archiveList").innerHTML=ar.length?ar.map(q=>`<div class="room archive"><b>📦 ${esc(q.name)}</b><div class="small">${q.rooms.length} Räume · archiviert ${q.archivedAt?new Date(q.archivedAt).toLocaleDateString("de-DE"):""}</div><button class="btn light" onclick="state.activeId='${q.id}';persist();render()">Archiv ansehen</button><button class="btn green" onclick="reactivate('${q.id}')">Reaktivieren</button></div>`).join(""):"<span class='small'>Noch keine archivierten Projekte.</span>";renderDash();renderPlans()}
 seedPlanRooms();render();
-
-/* ===== V11 Aufnahme / Montage / Klärung ===== */
-const V11_COMPONENTS = (typeof C!=="undefined" ? C : [
-"Aktor · HmIP-eTRV-C-2","CO₂-Melder","Wandthermostat · 230 V · verstellbar",
-"Wandthermostat · 230 V · nicht verstellbar","Wandthermostat · Batterie · verstellbar",
-"Wandthermostat · Batterie · nicht verstellbar","Glas-Wandthermostat · 230 V",
-"Fußbodenheizung · HmIP-FALMOT-C12","Stellantrieb FBH · HmIP-VDMOT"
-]);
-
-function v11Rooms(){
- const pr=(typeof p==="function"?p():null);
- return pr&&Array.isArray(pr.rooms)?pr.rooms:[];
-}
-function v11Ensure(r){
- if(!Array.isArray(r.installations)) r.installations=[];
- return r.installations;
-}
-function v11Save(){
- if(typeof persist==="function") persist();
- if(typeof renderDash==="function") renderDash();
-}
-function v11Add(roomId, type){
- if(!type)return;
- const r=v11Rooms().find(x=>x.id===roomId); if(!r)return;
- v11Ensure(r).push({id:"i_"+Date.now()+"_"+Math.random().toString(36).slice(2,7),type,before:null,after:null,note:"",clarify:false,clarifyNote:"",clarifyResolved:false,resolution:"",createdAt:new Date().toISOString()});
- v11Save(); renderWorkflow("aufnahme", roomId);
-}
-function v11Remove(roomId,iid){
- const r=v11Rooms().find(x=>x.id===roomId); if(!r)return;
- r.installations=v11Ensure(r).filter(x=>x.id!==iid);
- v11Save(); renderWorkflow("aufnahme", roomId); renderWorkflow("montage", roomId);
-}
-function v11ItemNote(roomId,iid,val){
- const r=v11Rooms().find(x=>x.id===roomId), it=r&&v11Ensure(r).find(x=>x.id===iid); if(!it)return;
- it.note=val; v11Save();
-}
-function v11Clarify(roomId,iid,on){
- const r=v11Rooms().find(x=>x.id===roomId); const it=r&&v11Ensure(r).find(x=>x.id===iid); if(!it)return;
- it.clarify=on; if(!on){it.clarifyResolved=false}
- v11Save(); renderWorkflow("aufnahme"); renderWorkflow("montage");
-}
-function v11Note(roomId,iid,val){
- const r=v11Rooms().find(x=>x.id===roomId); const it=r&&v11Ensure(r).find(x=>x.id===iid); if(!it)return;
- it.clarifyNote=val; v11Save();
-}
-function v11Resolve(roomId,iid,on){
- const r=v11Rooms().find(x=>x.id===roomId); const it=r&&v11Ensure(r).find(x=>x.id===iid); if(!it)return;
- it.clarifyResolved=on; v11Save(); renderWorkflow("aufnahme"); renderWorkflow("montage");
-}
-function v11Resolution(roomId,iid,val){
- const r=v11Rooms().find(x=>x.id===roomId); const it=r&&v11Ensure(r).find(x=>x.id===iid); if(!it)return;
- it.resolution=val; v11Save();
-}
-function v11File(roomId,iid,phase,input){
- const f=input.files&&input.files[0]; if(!f)return;
- const rd=new FileReader();
- rd.onload=e=>{
-   const img=new Image();
-   img.onload=()=>{
-     const max=1600, sc=Math.min(1,max/Math.max(img.width,img.height));
-     const cv=document.createElement("canvas"); cv.width=Math.round(img.width*sc); cv.height=Math.round(img.height*sc);
-     cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
-     const data=cv.toDataURL("image/jpeg",.72);
-     const r=v11Rooms().find(x=>x.id===roomId); const it=r&&v11Ensure(r).find(x=>x.id===iid); if(!it)return;
-     it[phase]=data; it[phase+"At"]=new Date().toISOString(); v11Save();
-     renderWorkflow(phase==="before"?"aufnahme":"montage");
-   }; img.src=e.target.result;
- }; rd.readAsDataURL(f);
-}
-function v11Esc(x){return String(x??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
-function v11Photo(it,phase,roomId){
- const val=it[phase];
- return `<div class="photoBox">${val?`<img src="${val}">`:`<div class="small">${phase==="before"?"Noch kein Vorher-Foto":"Noch kein Nachher-Foto"}</div>`}
- <label class="camBtn">📷<input hidden type="file" accept="image/*" capture="environment" onchange="v11File('${roomId}','${it.id}','${phase}',this)"></label></div>`;
-}
-function v11ClarifyUI(r,it){
- if(!it.clarify)return "";
- return `<div class="clarifyBox">
- <b>⚠️ Klärung erforderlich</b>
- <textarea placeholder="Was muss geklärt werden?" oninput="v11Note('${r.id}','${it.id}',this.value)">${v11Esc(it.clarifyNote)}</textarea>
- <label><input type="checkbox" ${it.clarifyResolved?"checked":""} onchange="v11Resolve('${r.id}','${it.id}',this.checked)"> Klärung erledigt</label>
- ${it.clarifyResolved?`<textarea placeholder="Lösung / Entscheidung" oninput="v11Resolution('${r.id}','${it.id}',this.value)">${v11Esc(it.resolution)}</textarea>`:""}
- </div>`;
-}
-function v11RoomCard(r,mode){
- const items=v11Ensure(r);
- const opts=V11_COMPONENTS.map(x=>`<option value="${v11Esc(x)}">${v11Esc(x)}</option>`).join("");
- const list=items.map((it,n)=>`<div class="instItem">
-   <div class="instHead"><div class="instTitle">${v11Esc(it.type)} <span class="small">#${n+1}</span></div>
-   ${mode==="aufnahme"?`<button class="smallDanger" onclick="v11Remove('${r.id}','${it.id}')">Entfernen</button>`:""}</div>
-   ${mode==="aufnahme"?`${v11Photo(it,"before",r.id)}<textarea style="width:100%;min-height:65px;margin-top:10px" placeholder="Notiz zur Einbausituation / Besonderheiten" oninput="v11ItemNote('${r.id}','${it.id}',this.value)">${v11Esc(it.note||"")}</textarea>`:`${it.note?`<div class="card" style="margin:10px 0;padding:10px"><b>Notiz aus der Aufnahme</b><div>${v11Esc(it.note)}</div></div>`:""}<div class="photoPair"><div><div class="small"><b>VORHER · EINBAUSITUATION</b></div>${v11Photo(it,"before",r.id)}</div><div><div class="small"><b>NACHHER · MONTAGE</b></div>${v11Photo(it,"after",r.id)}</div></div>`}
-   <label style="display:block;margin-top:10px"><input type="checkbox" ${it.clarify?"checked":""} onchange="v11Clarify('${r.id}','${it.id}',this.checked)"> ⚠️ Klärung erforderlich</label>
-   ${v11ClarifyUI(r,it)}
- </div>`).join("");
- const complete=items.length>0&&items.every(x=>x.after);
- return `<div class="card" id="wf_${r.id}">
- <div class="instHead"><div><b>${v11Esc((typeof floorLabel==="function"?floorLabel(r.floor):r.floor)||"")} · ${v11Esc(r.num||r.name||"Raum")}</b>
- ${r.name&&r.name!==r.num?`<div class="small">${v11Esc(r.name)}</div>`:""}</div>${mode==="montage"&&complete?'<span class="doneBadge">✓ fertig</span>':""}</div>
- ${mode==="aufnahme"?`<div class="addCompRow"><select id="sel_${r.id}"><option value="">Komponente auswählen …</option>${opts}</select><button onclick="let e=document.getElementById('sel_${r.id}');v11Add('${r.id}',e.value);e.value=''">+ Hinzufügen</button></div>`:""}
- ${items.length?list:`<div class="small" style="margin-top:12px">Noch keine Komponenten für diesen Raum aufgenommen.</div>`}
- </div>`;
-}
-function renderWorkflow(mode, keepRoomId){
- const el=document.getElementById(mode==="aufnahme"?"aufnahmeWorkflow":"montageWorkflow"); if(!el)return;
- const oldOpen=[...el.querySelectorAll("details.floorGroup[open]")].map(d=>d.dataset.floor);
- const rr=v11Rooms(), floors=[...new Set(rr.map(x=>x.floor))];
- const keepRoom=keepRoomId&&rr.find(x=>x.id===keepRoomId);
- el.innerHTML=floors.map(f=>{
-   const rooms=rr.filter(x=>x.floor===f);
-   const floorOpen=oldOpen.includes(String(f))||(keepRoom&&String(keepRoom.floor)===String(f));
-   return `<details class="floorGroup" data-floor="${v11Esc(f)}" ${floorOpen?"open":""}>
-     <summary><b>${v11Esc(typeof floorLabel==="function"?floorLabel(f):f)}</b> · ${rooms.length} Räume</summary>
-     ${rooms.map(r=>`<details class="roomGroup" ${keepRoomId===r.id?"open":""}>
-       <summary><b>${v11Esc(r.num||r.name||"Raum")}</b>${r.name&&r.name!==r.num?` · ${v11Esc(r.name)}`:""} · ${v11Ensure(r).length} Komponenten</summary>
-       ${v11RoomCard(r,mode)}
-     </details>`).join("")}
-   </details>`;
- }).join("");
- if(keepRoomId)setTimeout(()=>document.getElementById("wf_"+keepRoomId)?.scrollIntoView({block:"center"}),30);
- renderClarifications();
-}
-function renderClarifications(){
- let box=document.getElementById("v11Clarifications");
- if(!box){
-   const dash=document.getElementById("dashboard")||document.getElementById("dash");
-   if(!dash)return;
-   box=document.createElement("div"); box.id="v11Clarifications"; dash.appendChild(box);
- }
- const all=[];
- v11Rooms().forEach(r=>v11Ensure(r).forEach(it=>{if(it.clarify&&!it.clarifyResolved)all.push({r,it})}));
- box.innerHTML=`<div class="card clarifyCard"><h3>⚠️ Klärung erforderlich · ${all.length}</h3>
- ${all.length?all.map(({r,it})=>`<div class="instItem">
- <b>${v11Esc(typeof floorLabel==="function"?floorLabel(r.floor):r.floor)} · ${v11Esc(r.num||r.name)} · ${v11Esc(it.type)}</b>
- ${it.before?`<img src="${it.before}" style="width:100%;max-width:260px;border-radius:10px;margin-top:8px">`:""}
- <div style="margin-top:7px">${v11Esc(it.clarifyNote||"Noch keine Notiz hinterlegt.")}</div>
- <button style="margin-top:8px" onclick="show('aufnahme');renderWorkflow('aufnahme');setTimeout(()=>document.getElementById('wf_${r.id}')?.scrollIntoView({behavior:'smooth'}),100)">Raum öffnen</button>
- </div>`).join(""):'<div class="small">Keine offenen Klärungen.</div>'}</div>`;
-}
-setTimeout(()=>{renderWorkflow("aufnahme");renderWorkflow("montage");renderClarifications()},100);
-
 </script></body></html>
