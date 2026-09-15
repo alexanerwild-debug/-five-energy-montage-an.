@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111820">
+<title>FIV.Energy Montage</title>
+<style>
+:root{--bg:#f4f6f8;--card:#fff;--ink:#17202a;--muted:#6b7280;--green:#1f8f5f;--red:#c74747}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink)}
+header{background:#111820;color:#fff;padding:18px;position:sticky;top:0;z-index:5}.brand{font-size:22px;font-weight:800}.brand span{font-weight:400}.sub{font-size:12px;color:#b8c0c8;margin-top:3px}
+main{max-width:760px;margin:auto;padding:14px 14px 80px}h1{font-size:23px;margin:4px 0 14px}h2{font-size:18px;margin:0 0 10px}
+.card{background:#fff;border-radius:15px;padding:15px;margin-bottom:12px;box-shadow:0 1px 5px #00000012}.muted{color:var(--muted);font-size:13px}
+.room{border:1px solid #e5e8eb;border-radius:14px;padding:14px;margin:10px 0}.roomtop{display:flex;gap:10px;align-items:flex-start}.roomname{font-weight:800;flex:1}.pill{font-size:12px;padding:5px 8px;border-radius:999px;background:#edf0f2}
+.actions{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:11px}.btn{display:block;text-align:center;border:0;border-radius:11px;padding:12px 8px;font-size:14px;font-weight:750;cursor:pointer}.camera{background:#111820;color:white}.gallery{background:#e9edf1;color:#17202a}.hidden{display:none}
+.preview{width:100%;max-height:250px;object-fit:cover;border-radius:11px;margin-top:10px;display:none}.photoStatus{margin-top:7px;font-size:12px;color:#1f8f5f;font-weight:700}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.stat{background:#fff;border-radius:13px;padding:13px}.num{font-size:25px;font-weight:800}
+.notice{background:#fff6da;border:1px solid #f0d67d;border-radius:12px;padding:12px;font-size:13px;margin-bottom:12px}
+button.reset{width:100%;border:0;border-radius:12px;background:#e9edf1;padding:12px;font-weight:700}
+.manage{margin-bottom:12px}.manage input,.manage textarea,.manage select{width:100%;padding:11px;margin:5px 0;border:1px solid #d8dde2;border-radius:10px;font-size:14px}.manage textarea{min-height:65px}.teamrow{display:flex;gap:7px;margin:7px 0}.teamrow input{flex:1}.note{background:#f7f8fa;padding:9px;border-radius:9px;margin-top:8px;font-size:13px;white-space:pre-wrap}</style>
+</head>
+<body>
+<header><div class="brand">FIV.<span>Energy</span></div><div class="sub">Montage & Fotodokumentation</div></header>
+<main>
+<div class="notice"><b>Fotofunktion:</b> Tippe bei einem Raum auf „Foto aufnehmen“. Auf dem iPhone sollte sich direkt die Kamera öffnen. „Aus Mediathek“ wählt ein vorhandenes Bild.</div>
+<h1>Projekt: Demo Gewerbeobjekt</h1>
+<div class="card manage"><h2>Teams verwalten</h2><div id="teamList"></div><div class="teamrow"><input id="teamNew" placeholder="Teamname"><button class="btn camera" onclick="addTeam()">＋ Team</button></div></div>
+<div class="card manage"><h2>Raum anlegen</h2><input id="roomNew" placeholder="Raumname / Raumnummer"><select id="roomTeam"></select><textarea id="roomNote" placeholder="Notiz zum Raum / Einbausituation"></textarea><button class="btn camera" style="width:100%" onclick="addRoom()">＋ Raum anlegen</button></div>
+<div class="stats">
+<div class="stat"><div class="muted">Räume</div><div class="num" id="roomCount"></div></div>
+<div class="stat"><div class="muted">Raumfotos</div><div class="num" id="photoCount"></div></div>
+</div>
+<div class="card" style="margin-top:12px"><h2>Räume</h2><div id="rooms"></div></div>
+<button class="reset" onclick="resetAll()">Demo-Fotos zurücksetzen</button>
+</main>
+
+<script>
+const seed=[
+{id:1,name:"EG 001 – Büro Empfang",team:"Team 1",components:4},
+{id:2,name:"EG 002 – Besprechung",team:"Team 1",components:3},
+{id:3,name:"1. OG 101 – Büro",team:"Team 2",components:3},
+{id:4,name:"1. OG 102 – Archiv",team:"Team 2",components:2},
+{id:5,name:"2. OG 201 – Büro Leitung",team:"Team 3",components:5}
+];
+let teams=JSON.parse(localStorage.getItem("five_v3_teams")||'["Team 1","Team 2","Team 3"]');
+let data=JSON.parse(localStorage.getItem("five_v2_rooms")||"null")||seed.map(r=>({...r,photo:"",note:""}));
+data=data.map(r=>({...r,note:r.note||""}));
+
+function save(){localStorage.setItem("five_v2_rooms",JSON.stringify(data));localStorage.setItem("five_v3_teams",JSON.stringify(teams))}
+function addTeam(){let n=teamNew.value.trim();if(!n)return;teams.push(n);teamNew.value="";save();render()}
+function renameTeam(i){let n=prompt("Teamname ändern:",teams[i]);if(n&&n.trim()){let old=teams[i];teams[i]=n.trim();data.forEach(r=>{if(r.team===old)r.team=n.trim()});save();render()}}
+function addRoom(){let n=roomNew.value.trim();if(!n)return alert("Bitte Raumname eingeben.");data.push({id:Date.now(),name:n,team:roomTeam.value||"Kein Team",components:0,photo:"",note:roomNote.value.trim()});roomNew.value="";roomNote.value="";save();render()}
+function editNote(id){let r=data.find(x=>x.id===id),n=prompt("Notiz zu "+r.name+":",r.note||"");if(n!==null){r.note=n;save();render()}}
+function render(){
+ document.getElementById("roomCount").textContent=data.length;
+ document.getElementById("teamList").innerHTML=teams.map((t,i)=>`<div class="teamrow"><input value="${t.replaceAll('"','&quot;')}" readonly><button class="btn gallery" onclick="renameTeam(${i})">✎</button></div>`).join("");
+ document.getElementById("roomTeam").innerHTML=teams.map(t=>`<option>${t}</option>`).join("");
+ document.getElementById("photoCount").textContent=data.filter(r=>r.photo).length;
+ document.getElementById("rooms").innerHTML=data.map(r=>`
+ <div class="room">
+  <div class="roomtop">
+   <div class="roomname">${r.name}<div class="muted">${r.team} · ${r.components} Komponenten</div></div>
+   <span class="pill">${r.photo?"📷 Foto vorhanden":"kein Foto"}</span>
+  </div>
+  ${r.note?`<div class="note">📝 ${r.note}</div>`:""}<div class="actions">
+   <label class="btn camera">📷 Foto aufnehmen
+    <input class="hidden" type="file" accept="image/*" capture="environment" onchange="pick(event,${r.id})">
+   </label>
+   <label class="btn gallery">🖼️ Aus Mediathek
+    <input class="hidden" type="file" accept="image/*" onchange="pick(event,${r.id})">
+   </label>
+  </div>
+  <img id="img-${r.id}" class="preview" ${r.photo?`src="${r.photo}" style="display:block"`:""}>
+  <div class="photoStatus" id="status-${r.id}">${r.photo?"✓ Raumfoto gespeichert":""}</div><button class="btn gallery" style="width:100%;margin-top:8px" onclick="editNote(${r.id})">📝 Notiz bearbeiten</button>
+ </div>`).join("");
+}
+function pick(ev,id){
+ const file=ev.target.files && ev.target.files[0];
+ if(!file)return;
+ const reader=new FileReader();
+ reader.onload=e=>{
+   const r=data.find(x=>x.id===id);
+   r.photo=e.target.result;
+   save();
+   render();
+ };
+ reader.readAsDataURL(file);
+}
+function resetAll(){if(confirm("Alle gespeicherten Demo-Fotos löschen?")){data=seed.map(r=>({...r,photo:""}));save();render()}}
+render();
+</script>
+</body>
+</html>
