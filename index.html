@@ -29,6 +29,16 @@
 /* V12: workflow pages are true standalone menu pages */
 #aufnahme,#montage{display:none}
 #aufnahme.active,#montage.active{display:block}
+
+/* V13: legacy room/component forms are retired */
+#rooms,#bestand,#bestandsaufnahme,#legacyMontage{display:none!important}
+
+.roomGroup{margin:8px 0 8px 12px;border:1px solid #dbe3e8;border-radius:14px;background:#fff}
+.roomGroup>summary{padding:12px;cursor:pointer}
+.roomGroup>.card{box-shadow:none;border:0;margin:0}
+.floorGroup>summary{padding:8px 0;cursor:pointer;font-size:18px}
+.photoPair{align-items:start}
+.photoBox input[type=file]{display:none}
 </style></head><body>
 <header><div class="brand">FIV.Energy</div><div class="sub">Montage & Fotodokumentation</div></header>
 <div class="projectbar"><select id="projectSelect"></select><button class="btn green" style="width:auto;margin:0;padding:11px" onclick="newProject()">+ Projekt</button></div>
@@ -267,13 +277,19 @@ function v11RoomCard(r,mode){
 }
 function renderWorkflow(mode, keepRoomId){
  const el=document.getElementById(mode==="aufnahme"?"aufnahmeWorkflow":"montageWorkflow"); if(!el)return;
- const oldOpen=[...el.querySelectorAll("details[open]")].map(d=>d.dataset.floor);
+ const oldOpen=[...el.querySelectorAll("details.floorGroup[open]")].map(d=>d.dataset.floor);
  const rr=v11Rooms(), floors=[...new Set(rr.map(x=>x.floor))];
  const keepRoom=keepRoomId&&rr.find(x=>x.id===keepRoomId);
  el.innerHTML=floors.map(f=>{
    const rooms=rr.filter(x=>x.floor===f);
-   const open=oldOpen.includes(String(f))||(keepRoom&&String(keepRoom.floor)===String(f));
-   return `<details data-floor="${v11Esc(f)}" ${open?"open":""}><summary><b>${v11Esc(typeof floorLabel==="function"?floorLabel(f):f)}</b> · ${rooms.length} Räume</summary>${rooms.map(r=>v11RoomCard(r,mode)).join("")}</details>`;
+   const floorOpen=oldOpen.includes(String(f))||(keepRoom&&String(keepRoom.floor)===String(f));
+   return `<details class="floorGroup" data-floor="${v11Esc(f)}" ${floorOpen?"open":""}>
+     <summary><b>${v11Esc(typeof floorLabel==="function"?floorLabel(f):f)}</b> · ${rooms.length} Räume</summary>
+     ${rooms.map(r=>`<details class="roomGroup" ${keepRoomId===r.id?"open":""}>
+       <summary><b>${v11Esc(r.num||r.name||"Raum")}</b>${r.name&&r.name!==r.num?` · ${v11Esc(r.name)}`:""} · ${v11Ensure(r).length} Komponenten</summary>
+       ${v11RoomCard(r,mode)}
+     </details>`).join("")}
+   </details>`;
  }).join("");
  if(keepRoomId)setTimeout(()=>document.getElementById("wf_"+keepRoomId)?.scrollIntoView({block:"center"}),30);
  renderClarifications();
