@@ -27,6 +27,8 @@ main{max-width:760px;margin:auto;padding:14px 14px 80px}h1{font-size:24px;margin
 .empty{padding:18px;text-align:center;color:#6b7280}.small{font-size:12px}.full{width:100%}
 </style>
 </head>
+ <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <body>
 <header><div class="brand">FIV.<span>Energy</span></div><div class="sub">Montage & Fotodokumentation · Jugendamt</div></header>
 <nav>
@@ -158,6 +160,16 @@ function pick(ev,id){
  img.src=url;
 }
 showSection("dashboard");
+// Firebase-Verbindung Jugendamt Kassel
+const firebaseConfig = {
+  apiKey: "AIzaSyD6wtxad3px3Zd9VShD6C8aGDSN5QOUT78",
+  authDomain: "jugendamt-kassel.firebaseapp.com",
+  projectId: "jugendamt-kassel",
+  storageBucket: "jugendamt-kassel.firebasestorage.app",
+  messagingSenderId: "476970870228",
+  appId: "1:476970870228:web:a0172b201d9a6fcb97e241",
+  measurementId: "G-026T8T5XS1"
+};
 </script>
 </body>
 </html>
