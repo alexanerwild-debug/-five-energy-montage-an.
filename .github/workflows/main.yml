@@ -1,0 +1,27 @@
+name: Deploy Firebase Functions
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Repository laden
+        uses: actions/checkout@v4
+
+      - name: Node.js einrichten
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Firebase CLI installieren
+        run: npm install -g firebase-tools
+
+      - name: Abhängigkeiten installieren
+        working-directory: functions
+        run: npm install
+
+      - name: Firebase Functions bereitstellen
+        run: firebase deploy --only functions --project jugendamt-kassel --token "${{ secrets.FIREBASE_TOKEN }}"
