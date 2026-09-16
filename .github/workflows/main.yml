@@ -14,13 +14,14 @@ jobs:
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
-
+      
       - name: Bei Google Cloud anmelden
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: 'projects/476970870228/locations/global/workloadIdentityPools/github-actions/providers/github'
           service_account: 'firebase-adminsdk-fbsvc@jugendamt-kassel.iam.gserviceaccount.com'
-
+      - name: Google Auth testen
+        run: gcloud auth list
       - name: Node.js einrichten
         uses: actions/setup-node@v4
         with:
