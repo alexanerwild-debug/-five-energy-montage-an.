@@ -16,12 +16,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Bei Google Cloud anmelden
-        id: auth
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: 'projects/476970870228/locations/global/workloadIdentityPools/github-actions/providers/github'
           service_account: 'firebase-adminsdk-fbsvc@jugendamt-kassel.iam.gserviceaccount.com'
-          create_credentials_file: true
 
       - name: Node.js einrichten
         uses: actions/setup-node@v4
@@ -33,6 +31,6 @@ jobs:
         run: npm install
 
       - name: Firebase Functions bereitstellen
-        env:
-          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
-        run: npx --yes firebase-tools deploy --only functions --project jugendamt-kassel --debug
+        run: |
+          export CLOUDSDK_AUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+          npx --yes firebase-tools deploy --only functions --project jugendamt-kassel --debug
