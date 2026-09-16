@@ -32,5 +32,8 @@ jobs:
 
       - name: Firebase Functions bereitstellen
         run: |
-          export CLOUDSDK_AUTH_ACCESS_TOKEN=$(gcloud auth print-access-token)
+          TOKEN=$(gcloud auth print-access-token)
+          unset GOOGLE_APPLICATION_CREDENTIALS
+          export GOOGLE_OAUTH_ACCESS_TOKEN="$TOKEN"
+          export FIREBASE_TOKEN="$TOKEN"
           npx --yes firebase-tools deploy --only functions --project jugendamt-kassel --debug
