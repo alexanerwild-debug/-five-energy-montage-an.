@@ -3,6 +3,10 @@ name: Deploy Firebase Functions
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -10,6 +14,12 @@ jobs:
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
+
+      - name: Bei Google Cloud anmelden
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: 'projects/476970870228/locations/global/workloadIdentityPools/github-actions/providers/github'
+          service_account: 'firebase-adminsdk-fbsvc@jugendamt-kassel.iam.gserviceaccount.com'
 
       - name: Node.js einrichten
         uses: actions/setup-node@v4
@@ -24,4 +34,4 @@ jobs:
         run: npm install
 
       - name: Firebase Functions bereitstellen
-        run: firebase deploy --only functions --project jugendamt-kassel --token "${{ secrets.FIREBASE_TOKEN }}"
+        run: firebase deploy --only functions --project jugendamt-kassel
