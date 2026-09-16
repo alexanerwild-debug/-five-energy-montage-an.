@@ -14,25 +14,25 @@ jobs:
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
-      
+
       - name: Bei Google Cloud anmelden
+        id: auth
         uses: google-github-actions/auth@v3
         with:
           workload_identity_provider: 'projects/476970870228/locations/global/workloadIdentityPools/github-actions/providers/github'
           service_account: 'firebase-adminsdk-fbsvc@jugendamt-kassel.iam.gserviceaccount.com'
-      - name: Google Auth testen
-        run: gcloud auth login --brief --cred-file="$GOOGLE_GHA_CREDS_PATH"
+          create_credentials_file: true
+
       - name: Node.js einrichten
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-
-      - name: Firebase CLI installieren
-        run: npm install -g firebase-tools@15.22.1
 
       - name: Abhängigkeiten installieren
         working-directory: functions
         run: npm install
 
       - name: Firebase Functions bereitstellen
-        run: firebase deploy --only functions --project jugendamt-kassel --debug
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
+        run: npx --yes firebase-tools deploy --only functions --project jugendamt-kassel --debug
