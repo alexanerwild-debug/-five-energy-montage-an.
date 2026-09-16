@@ -35,4 +35,4 @@ jobs:
         run: npm install
 
       - name: Firebase Functions bereitstellen
-        run: firebase deploy --only functions --project jugendamt-kassel
+        run: firebase deploy --only functions --project jugendamt-kassel --debug
