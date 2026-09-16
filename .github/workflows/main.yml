@@ -21,7 +21,7 @@ jobs:
           workload_identity_provider: 'projects/476970870228/locations/global/workloadIdentityPools/github-actions/providers/github'
           service_account: 'firebase-adminsdk-fbsvc@jugendamt-kassel.iam.gserviceaccount.com'
       - name: Google Auth testen
-        run: gcloud auth list
+        run: gcloud auth login --brief --cred-file="$GOOGLE_GHA_CREDS_PATH"
       - name: Node.js einrichten
         uses: actions/setup-node@v4
         with:
