@@ -712,20 +712,24 @@ if (typeof auth !== "undefined" && auth) {
 }
 
 window.startRoomWork = async function(rid) {
-  let proj = p(), room = proj.rooms.find(x => x.id === rid);
+  let proj = (typeof p === "function") ? p() : null;
+  let rooms = proj ? (proj.rooms || (proj.project && proj.project.rooms) || []) : [];
+  let room = rooms.find(x => x.id === rid);
   if (!room) return;
   room.startedAt = Date.now();
   room.status = "in_progress";
-  await fsProject().update({ rooms: proj.rooms });
+  await fsProject().update({ rooms: rooms });
   if (typeof render === "function") render();
 };
 
 window.finishRoomWork = async function(rid) {
-  let proj = p(), room = proj.rooms.find(x => x.id === rid);
+  let proj = (typeof p === "function") ? p() : null;
+  let rooms = proj ? (proj.rooms || (proj.project && proj.project.rooms) || []) : [];
+  let room = rooms.find(x => x.id === rid);
   if (!room) return;
   room.completedAt = Date.now();
   room.status = "completed";
-  await fsProject().update({ rooms: proj.rooms });
+  await fsProject().update({ rooms: rooms });
   if (typeof render === "function") render();
 };
 
@@ -754,13 +758,24 @@ if (typeof wfRoomHtml === "function") {
 }
 
 function drawAdminBoard() {
-  let proj = (typeof p === "function") ? p() : null;
   let target = document.getElementById("stats");
-  if (!proj || !proj.rooms || !target) return;
-  let total = proj.rooms.length;
-  let completed = proj.rooms.filter(r => r.completedAt || r.status === "completed").length;
-  let inProgress = proj.rooms.filter(r => (r.startedAt && !r.completedAt) || r.status === "in_progress").length;
-  let open = total - completed - inProgress;
+  if (!target) return;
+
+  let rooms = [];
+  try {
+    let proj = (typeof p === "function") ? p() : null;
+    if (proj) {
+      rooms = proj.rooms || (proj.project && proj.project.rooms) || [];
+    }
+    if (!rooms.length && typeof project !== "undefined" && project) {
+      rooms = project.rooms || [];
+    }
+  } catch(e) {}
+
+  let total = rooms.length;
+  let completed = rooms.filter(r => r.completedAt || r.status === "completed").length;
+  let inProgress = rooms.filter(r => (r.startedAt && !r.completedAt) || r.status === "in_progress").length;
+  let open = total > 0 ? (total - completed - inProgress) : 0;
 
   let el = document.getElementById("adminStatusBoard");
   if (!el) {
@@ -769,14 +784,14 @@ function drawAdminBoard() {
     el.style.cssText = "margin:16px 0;padding:16px;background:#f8fafc;border-radius:10px;border:1px solid #cbd5e1;";
     target.parentNode.insertBefore(el, target.nextSibling);
   }
-  el.innerHTML = "<div style="font-weight:700;margin-bottom:10px;">📊 Status-Übersicht</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;"><div style="background:#fee2e2;color:#ef4444;padding:8px;border-radius:6px;"><b>" + open + "</b><div style="font-size:11px;">Offen</div></div><div style="background:#fef3c7;color:#d97706;padding:8px;border-radius:6px;"><b>" + inProgress + "</b><div style="font-size:11px;">In Arbeit</div></div><div style="background:#dcfce7;color:#16a34a;padding:8px;border-radius:6px;"><b>" + completed + "</b><div style="font-size:11px;">Fertig</div></div></div>";
+  el.innerHTML = "<div style="font-weight:700;margin-bottom:10px;color:#1e293b;">📊 Bauleiter Status-Übersicht</div><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;"><div style="background:#fee2e2;color:#ef4444;padding:8px;border-radius:6px;"><b style="font-size:18px;">" + open + "</b><div style="font-size:11px;">Offen</div></div><div style="background:#fef3c7;color:#d97706;padding:8px;border-radius:6px;"><b style="font-size:18px;">" + inProgress + "</b><div style="font-size:11px;">In Arbeit</div></div><div style="background:#dcfce7;color:#16a34a;padding:8px;border-radius:6px;"><b style="font-size:18px;">" + completed + "</b><div style="font-size:11px;">Fertig</div></div></div>";
 }
 
 if (typeof renderDash === "function") {
   const origDash = renderDash;
   renderDash = function() { origDash(); drawAdminBoard(); };
 }
-setInterval(drawAdminBoard, 2000);
+setInterval(drawAdminBoard, 1500);
 </script>
 </body>
 </html>
