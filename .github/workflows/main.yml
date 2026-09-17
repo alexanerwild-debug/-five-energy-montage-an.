@@ -1,15 +1,80 @@
-name: Find Monteur UI
+name: Add Monteur UI Form
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  find:
+  update-ui:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Textsuche nach Monteur und Admin
+      - name: UI und Event-Handler fuer Monteur-Login aktualisieren
         run: |
-          grep -in -C 3 -E "(monteur|createMonteur|admin)" index.html | head -n 40 || echo "Nichts gefunden"
+          python3 -c '
+          with open("index.html", "r", encoding="utf-8") as f:
+              content = f.read()
+
+          old_block = """<label>Neues Team / Monteur</label><div class=\"row\"><input id=\"newTeam\" placeholder=\"Name\"><button class=\"btn green\" id=\"addTeam\" style=\"margin:0\">Hinzufügen</button></div>"""
+
+          new_block = """<label>Neuen Monteur-Account erstellen</label>
+          <div style=\"display:flex; flex-direction:column; gap:8px; margin-top:8px;\">
+            <input id=\"monteurName\" placeholder=\"Name des Monteurs\" style=\"padding:8px; border-radius:6px; border:1px solid #ccc;\">
+            <input id=\"monteurEmail\" type=\"email\" placeholder=\"E-Mail-Adresse\" style=\"padding:8px; border-radius:6px; border:1px solid #ccc;\">
+            <input id=\"monteurPassword\" type=\"password\" placeholder=\"Passwort (mind. 6 Zeichen)\" style=\"padding:8px; border-radius:6px; border:1px solid #ccc;\">
+            <button class=\"btn green\" id=\"btnCreateMonteurAccount\" style=\"margin-top:4px;\">Monteur anlegen & freischalten</button>
+            <div id=\"monteurStatusMsg\" style=\"font-size:13px; font-weight:bold; margin-top:4px;\"></div>
+          </div>
+          <script>
+            document.addEventListener("DOMContentLoaded", function() {
+              const btn = document.getElementById("btnCreateMonteurAccount");
+              if (btn) {
+                btn.addEventListener("click", async function() {
+                  const name = document.getElementById("monteurName").value.trim();
+                  const email = document.getElementById("monteurEmail").value.trim();
+                  const pass = document.getElementById("monteurPassword").value;
+                  const status = document.getElementById("monteurStatusMsg");
+
+                  if (!email || !pass) {
+                    status.style.color = "red";
+                    status.innerText = "Bitte E-Mail und Passwort eingeben!";
+                    return;
+                  }
+
+                  status.style.color = "blue";
+                  status.innerText = "Konto wird angelegt...";
+
+                  try {
+                    const projId = "jugendamt-kassel";
+                    await window.createMonteurDirect(email, pass, name, projId);
+                    status.style.color = "green";
+                    status.innerText = "Erfolg: Monteur-Konto angelegt! Login ab sofort moeglich.";
+                    document.getElementById("monteurName").value = "";
+                    document.getElementById("monteurEmail").value = "";
+                    document.getElementById("monteurPassword").value = "";
+                  } catch(err) {
+                    status.style.color = "red";
+                    status.innerText = "Fehler: " + (err.message || err);
+                  }
+                });
+              }
+            });
+          </script>"""
+
+          if old_block in content:
+              content = content.replace(old_block, new_block)
+              with open("index.html", "w", encoding="utf-8") as f:
+                  f.write(content)
+              print("Erfolgreich ausgetauscht!")
+          else:
+              print("Suchmuster nicht exakt gefunden!")
+          '
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add index.html
+          git commit -m "UI-Formular fuer Monteur-Account hinzugefuegt" || echo "Keine Aenderungen"
+          git push
