@@ -1,4 +1,4 @@
-name: Add Monteur UI Form
+name: Replace Team Input
 
 on:
   workflow_dispatch:
@@ -7,33 +7,28 @@ permissions:
   contents: write
 
 jobs:
-  update-ui:
+  replace:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: UI und Event-Handler fuer Monteur-Login aktualisieren
+      - name: Formular an Zeile 64 ersetzen
         run: |
-          python3 -c '
-          with open("index.html", "r", encoding="utf-8") as f:
-              content = f.read()
-
-          old_block = """<label>Neues Team / Monteur</label><div class=\"row\"><input id=\"newTeam\" placeholder=\"Name\"><button class=\"btn green\" id=\"addTeam\" style=\"margin:0\">Hinzufügen</button></div>"""
-
-          new_block = """<label>Neuen Monteur-Account erstellen</label>
-          <div style=\"display:flex; flex-direction:column; gap:8px; margin-top:8px;\">
-            <input id=\"monteurName\" placeholder=\"Name des Monteurs\" style=\"padding:8px; border-radius:6px; border:1px solid #ccc;\">
-            <input id=\"monteurEmail\" type=\"email\" placeholder=\"E-Mail-Adresse\" style=\"padding:8px; border-radius:6px; border:1px solid #ccc;\">
-            <input id=\"monteurPassword\" type=\"password\" placeholder=\"Passwort (mind. 6 Zeichen)\" style=\"padding:8px; border-radius:6px; border:1px solid #ccc;\">
-            <button class=\"btn green\" id=\"btnCreateMonteurAccount\" style=\"margin-top:4px;\">Monteur anlegen & freischalten</button>
-            <div id=\"monteurStatusMsg\" style=\"font-size:13px; font-weight:bold; margin-top:4px;\"></div>
+          cat << 'EOF' > replacement.html
+          <label>Neuen Monteur-Account erstellen</label>
+          <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
+            <input id="monteurName" placeholder="Name des Monteurs" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
+            <input id="monteurEmail" type="email" placeholder="E-Mail-Adresse" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
+            <input id="monteurPassword" type="password" placeholder="Passwort (mind. 6 Zeichen)" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
+            <button class="btn green" id="btnCreateMonteurAccount" type="button" style="margin-top:6px; padding:12px; font-weight:bold;">Monteur anlegen & freischalten</button>
+            <div id="monteurStatusMsg" style="font-size:14px; font-weight:bold; margin-top:6px;"></div>
           </div>
           <script>
-            document.addEventListener("DOMContentLoaded", function() {
+            window.addEventListener("load", function() {
               const btn = document.getElementById("btnCreateMonteurAccount");
               if (btn) {
-                btn.addEventListener("click", async function() {
+                btn.onclick = async function() {
                   const name = document.getElementById("monteurName").value.trim();
                   const email = document.getElementById("monteurEmail").value.trim();
                   const pass = document.getElementById("monteurPassword").value;
@@ -52,7 +47,7 @@ jobs:
                     const projId = "jugendamt-kassel";
                     await window.createMonteurDirect(email, pass, name, projId);
                     status.style.color = "green";
-                    status.innerText = "Erfolg: Monteur-Konto angelegt! Login ab sofort moeglich.";
+                    status.innerText = "Erfolg: Monteur angelegt! Er kann sich jetzt anmelden.";
                     document.getElementById("monteurName").value = "";
                     document.getElementById("monteurEmail").value = "";
                     document.getElementById("monteurPassword").value = "";
@@ -60,21 +55,16 @@ jobs:
                     status.style.color = "red";
                     status.innerText = "Fehler: " + (err.message || err);
                   }
-                });
+                };
               }
             });
-          </script>"""
-
-          if old_block in content:
-              content = content.replace(old_block, new_block)
-              with open("index.html", "w", encoding="utf-8") as f:
-                  f.write(content)
-              print("Erfolgreich ausgetauscht!")
-          else:
-              print("Suchmuster nicht exakt gefunden!")
-          '
+          </script>
+          EOF
+          sed -i 's|<label>Neues Team / Monteur</label>.*<button class="btn green" id="addTeam"[^>]*>Hinzufügen</button></div>|__REPLACE_HERE__|g' index.html
+          sed -i -e '/__REPLACE_HERE__/{r replacement.html' -e 'd}' index.html
+          rm replacement.html
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "UI-Formular fuer Monteur-Account hinzugefuegt" || echo "Keine Aenderungen"
+          git commit -m "UI: Monteur-Formular fest eingefuegt" || echo "Keine Aenderungen"
           git push
