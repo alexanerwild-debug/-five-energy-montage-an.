@@ -1,4 +1,4 @@
-name: Debug Login Error
+name: Rollback To Working State
 
 on:
   workflow_dispatch:
@@ -7,41 +7,19 @@ permissions:
   contents: write
 
 jobs:
-  debug-login:
+  rollback:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Login-Fehlerausgabe sichtbar machen
+      - name: index.html auf funktionierenden Stand zuruecksetzen
         run: |
-          python3 -c '
-          with open("index.html", "r", encoding="utf-8") as f:
-              c = f.read()
-
-          # Service Worker deregistrieren erzwingen
-          sw_killer = """<script>
-          if ("serviceWorker" in navigator) {
-            navigator.serviceWorker.getRegistrations().then(function(regs) {
-              for(let r of regs) { r.unregister(); }
-            });
-          }
-          window.addEventListener("unhandledrejection", function(e) {
-            alert("Promise-Fehler: " + (e.reason ? (e.reason.message || e.reason) : e));
-          });
-          </script>"""
-          c = c.replace("<head>", "<head>" + sw_killer)
-
-          # signInWithEmailAndPassword mit Alert absichern
-          old_login = "signInWithEmailAndPassword(email, pass)"
-          new_login = "signInWithEmailAndPassword(email, pass).catch(err => { alert(\"Login-Fehler: \" + err.message); throw err; })"
-          c = c.replace(old_login, new_login)
-
-          with open("index.html", "w", encoding="utf-8") as f:
-              f.write(c)
-          '
+          git checkout 844beae -- index.html
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Debug: Unregister SW & Alert Login Error" || echo "Keine Aenderungen"
+          git commit -m "Rollback: index.html auf funktionierenden Stand zurueckgesetzt" || echo "Keine Aenderung noetig"
           git push
