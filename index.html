@@ -44,7 +44,12 @@
 </div>
 <header><div class="brand">FIV.Energy</div><div class="sub">Montage & Fotodokumentation</div></header>
 <div class="projectbar"><select id="projectSelect"></select><button class="btn green" style="width:auto;margin:0;padding:11px" onclick="newProject()">+ Projekt</button></div>
-<button class="mobileMenu" onclick="document.querySelector('.side').classList.toggle('open')">☰</button><div class="appShell"><aside class="side"><div class="navTitle">FIV.Energy</div><button data-tab="dashboard" class="active">⌂ Übersicht</button><button data-tab="projekte">▣ Projekte & Archiv</button><button data-tab="bestand">▤ Aufnahme Räume & Bestand</button><button data-tab="plaene">⌑ Pläne</button><button data-tab="montage">✓ Montage</button><button data-tab="hauptkomponenten">▦ Hauptkomponenten</button><button data-tab="teams">♙ Teams</button><div class="navTitle">Wissen & Vorbereitung</div><button data-tab="komponenten">◇ Komponenten</button><button data-tab="arbeitsvorbereitung">🧰 Arbeitsvorbereitung</button><button data-tab="hilfe">▢ Montageanleitungen</button></aside><main>
+<button class="mobileMenu" onclick="document.querySelector('.side').classList.toggle('open')">☰</button><div class="appShell"><aside class="side"><div class="navTitle" style="padding:10px 0;">
+  <select id="companyModeSelect" onchange="window.switchCompanyMode && window.switchCompanyMode(this.value)" style="width:100%; padding:8px; border-radius:6px; background:#1b2430; color:#fff; font-weight:bold; border:1px solid #4a5568; font-size:14px;">
+    <option value="five-energy">⚡ FIV.Energy</option>
+    <option value="macbright">💡 Macbright (Licht)</option>
+  </select>
+</div><button data-tab="dashboard" class="active">⌂ Übersicht</button><button data-tab="projekte">▣ Projekte & Archiv</button><button data-tab="bestand">▤ Aufnahme Räume & Bestand</button><button data-tab="plaene">⌑ Pläne</button><button data-tab="montage">✓ Montage</button><button data-tab="hauptkomponenten">▦ Hauptkomponenten</button><button data-tab="teams">♙ Teams</button><div class="navTitle">Wissen & Vorbereitung</div><button data-tab="komponenten">◇ Komponenten</button><button data-tab="arbeitsvorbereitung">🧰 Arbeitsvorbereitung</button><button data-tab="hilfe">▢ Montageanleitungen</button></aside><main>
 <section id="dashboard" class="section active"><h1 id="dashTitle">Dashboard</h1><div class="grid" id="stats"></div><div class="card"><h2>Fortschritt</h2><div class="small" id="progText"></div><div class="progress"><i id="progBar"></i></div></div><div class="card"><h2>Materialbedarf gesamt</h2><div id="totals"></div></div><div class="card"><h2>Material nach Etage</h2><div id="floors"></div></div></section>
 <section id="bestand" class="section">
 <h1>Aufnahme Räume & Bestand</h1>
@@ -212,14 +217,14 @@ function wfPhotoBox(r,it,phase){
 }
 function wfClarify(r,it,mode){
  return `<label style="display:block;margin-top:9px"><input type="checkbox" ${it.clarify?"checked":""} onchange="wfSet('${r.id}','${it.id}','clarify',this.checked);renderWorkflow('${mode}','${r.id}')"> ⚠️ Klärung erforderlich</label>
- ${it.clarify?`<div class="wfClarify"><b>Was muss geklärt werden?</b><textarea placeholder="Problem / erforderliche Klärung" oninput="wfSet('${r.id}','${it.id}','clarifyNote',this.value)">${wfEsc(it.clarifyNote||"")}</textarea>
+ ${it.clarify?`<div class="wfClarify"><b>Was muss geklärt werden?</b><textarea placeholder="Problem / erforderliche Klärung" onchange="wfSet('${r.id}','${it.id}','clarifyNote',this.value)">${wfEsc(it.clarifyNote||"")}</textarea>
  <label><input type="checkbox" ${it.clarifyResolved?"checked":""} onchange="wfSet('${r.id}','${it.id}','clarifyResolved',this.checked);renderWorkflow('${mode}','${r.id}')"> Klärung erledigt</label>
- ${it.clarifyResolved?`<textarea placeholder="Lösung / Entscheidung" oninput="wfSet('${r.id}','${it.id}','resolution',this.value)">${wfEsc(it.resolution||"")}</textarea>`:""}</div>`:""}`
+ ${it.clarifyResolved?`<textarea placeholder="Lösung / Entscheidung" onchange="wfSet('${r.id}','${it.id}','resolution',this.value)">${wfEsc(it.resolution||"")}</textarea>`:""}</div>`:""}`
 }
 function wfItemHtml(r,it,n,mode){
  let after=mode==="after";
  return `<div class="wfItem"><div class="wfHead"><div class="wfTitle">${wfEsc(it.type)} <span class="small">#${n+1}</span></div>${!after&&it.createdBy===authUid()?`<button class="wfRemove" onclick="wfRemove('${r.id}','${it.id}')">Entfernen</button>`:""}</div>
- ${after?(it.note?`<div class="card" style="padding:9px;margin:9px 0"><b>Notiz aus der Aufnahme</b><div>${wfEsc(it.note)}</div></div>`:"")+`<div class="wfPhotoPair">${wfPhotoBox(r,it,"before")}${wfPhotoBox(r,it,"after")}</div>`:wfPhotoBox(r,it,"before")+`<textarea class="wfNote" placeholder="Notiz zur Einbausituation / Besonderheiten" oninput="wfSet('${r.id}','${it.id}','note',this.value)">${wfEsc(it.note||"")}</textarea>`}
+ ${after?(it.note?`<div class="card" style="padding:9px;margin:9px 0"><b>Notiz aus der Aufnahme</b><div>${wfEsc(it.note)}</div></div>`:"")+`<div class="wfPhotoPair">${wfPhotoBox(r,it,"before")}${wfPhotoBox(r,it,"after")}</div>`:wfPhotoBox(r,it,"before")+`<textarea class="wfNote" placeholder="Notiz zur Einbausituation / Besonderheiten" onchange="wfSet('${r.id}','${it.id}','note',this.value)">${wfEsc(it.note||"")}</textarea>`}
  ${wfClarify(r,it,mode)}</div>`
 }
 function wfRoomHtml(r,mode){
