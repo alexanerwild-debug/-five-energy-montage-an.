@@ -49,6 +49,26 @@
     padding: 14px 16px 6px 16px !important;
   }
 </style>
+
+<style id="teams-isolation-style">
+  #monteur-register-card {
+    display: none;
+  }
+</style>
+<script>
+function checkMonteurVisibility() {
+  const card = document.getElementById("monteur-register-card");
+  if (!card) return;
+  const teamsView = document.getElementById("viewTeams") || document.querySelector("[id*='Teams' i]");
+  if (teamsView && window.getComputedStyle(teamsView).display !== "none") {
+    card.style.display = "block";
+  } else {
+    card.style.display = "none";
+  }
+}
+setInterval(checkMonteurVisibility, 250);
+</script>
+
 </head><body>
 <div id="loginGate" class="loginGate">
  <div class="loginCard">
@@ -365,7 +385,7 @@ function renderMainComponents(){
  <label><input type="checkbox" ${it.done?"checked":""} onchange="mcSet('${it.id}','done',this.checked)"> Erledigt</label>
  </div></div>`).join("");
 }
-function render(){let x=p();$("projectSelect").innerHTML=state.projects.map(q=>`<option value="${q.id}" ${q.id===x.id?"selected":""}>${q.status==="archived"?"📦 ":""}${esc(q.name)}</option>`).join("");$("teamList").innerHTML=x.teams.map(t=>`<div style="padding:9px 0;border-bottom:1px solid #eee">${esc(t)}</div>`).join("");let sorted=[...x.rooms].sort((a,b)=>a.floor-b.floor||a.num.localeCompare(b.num));$("projectInfo").innerHTML=`<b>${esc(x.name)}</b><div class="small">Status: ${x.status==="archived"?"Archiviert":"Aktiv"}</div>${x.status==="archived"?`<button class="btn green" onclick="reactivate('${x.id}')">Projekt reaktivieren</button>`:""}`;let ar=state.projects.filter(q=>q.status==="archived");$("archiveList").innerHTML=ar.length?ar.map(q=>`<div class="room archive"><b>📦 ${esc(q.name)}</b><div class="small">${q.rooms.length} Räume · archiviert ${q.archivedAt?new Date(q.archivedAt).toLocaleDateString("de-DE"):""}</div><button class="btn light" onclick="state.activeId='${q.id}';persist();render()">Archiv ansehen</button><button class="btn green" onclick="reactivate('${q.id}')">Reaktivieren</button></div>`).join(""):"<span class='small'>Noch keine archivierten Projekte.</span>";renderDash();renderPlans();renderWorkflow("before");renderWorkflow("after");renderClarificationDashboard()}
+function render(){let x=p();$("projectSelect").innerHTML=state.projects.map(q=>`<option value="${q.id}" ${q.id===x.id?"selected":""}>${q.status==="archived"?"📦 ":""}${esc(q.name)}</option>`).join("");$("teamList").innerHTML=x.teams.map(t=>`<div style="padding:9px 0;border-bottom:1px solid #eee"><div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee;"><span>${esc(t)}</span><button type="button" class="btn" style="background:#ef4444;color:#fff;padding:4px 10px;font-size:12px;border-radius:6px;cursor:pointer;" onclick="removeTeamMember('${esc(t)}')">Entfernen</button></div>`).join("");let sorted=[...x.rooms].sort((a,b)=>a.floor-b.floor||a.num.localeCompare(b.num));$("projectInfo").innerHTML=`<b>${esc(x.name)}</b><div class="small">Status: ${x.status==="archived"?"Archiviert":"Aktiv"}</div>${x.status==="archived"?`<button class="btn green" onclick="reactivate('${x.id}')">Projekt reaktivieren</button>`:""}`;let ar=state.projects.filter(q=>q.status==="archived");$("archiveList").innerHTML=ar.length?ar.map(q=>`<div class="room archive"><b>📦 ${esc(q.name)}</b><div class="small">${q.rooms.length} Räume · archiviert ${q.archivedAt?new Date(q.archivedAt).toLocaleDateString("de-DE"):""}</div><button class="btn light" onclick="state.activeId='${q.id}';persist();render()">Archiv ansehen</button><button class="btn green" onclick="reactivate('${q.id}')">Reaktivieren</button></div>`).join(""):"<span class='small'>Noch keine archivierten Projekte.</span>";renderDash();renderPlans();renderWorkflow("before");renderWorkflow("after");renderClarificationDashboard()}
 seedPlanRooms();render();
 </script><script src="create-monteur.js"></script>
 <div id=\"monteur-create-box\" style=\"display:none;\"><div id="monteur-admin-box" style="margin: 20px auto; max-width: 420px; padding: 16px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e0e0e0; font-family: sans-serif;">
@@ -459,5 +479,23 @@ function updateMonteurBoxVisibility() {
 window.addEventListener("hashchange", updateMonteurBoxVisibility);
 setInterval(updateMonteurBoxVisibility, 500);
 </script>
+
+<script>
+window.removeTeamMember = async function(name) {
+  if (!confirm('Möchtest du "' + name + '" wirklich entfernen?')) return;
+  try {
+    let proj = (typeof p === "function") ? p() : null;
+    if (!proj || !proj.id) return;
+    let currentTeams = proj.teams || [];
+    let updated = currentTeams.filter(t => t !== name);
+    await fsProjects().doc(proj.id).update({ teams: updated });
+    if (typeof toast === "function") toast("Monteur entfernt");
+  } catch (e) {
+    console.error(e);
+    alert("Fehler beim Entfernen: " + e.message);
+  }
+};
+</script>
+
 </body>
 </html>
