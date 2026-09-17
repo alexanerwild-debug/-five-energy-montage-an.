@@ -1,4 +1,4 @@
-name: Add Monteur Form Clean
+name: Fix Notes Keyboard and Add Macbright Switcher
 
 on:
   workflow_dispatch:
@@ -7,85 +7,127 @@ permissions:
   contents: write
 
 jobs:
-  add-ui:
+  apply-updates:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Formular sicher vor schließendem body einsetzen
+      - name: Tastatur-Fix und Macbright Umschalter einbauen
         run: |
-          cat << 'EOF' > injection.html
-          <div id="monteur-admin-box" style="margin: 20px auto; max-width: 420px; padding: 16px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e0e0e0; font-family: sans-serif;">
-            <h3 style="margin-top:0; color:#2e7d32; font-size:18px;">Neuen Monteur anlegen</h3>
-            <div style="display:flex; flex-direction:column; gap:10px;">
-              <input id="newMonteurName" type="text" placeholder="Name des Monteurs" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
-              <input id="newMonteurEmail" type="email" placeholder="E-Mail-Adresse" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
-              <input id="newMonteurPass" type="password" placeholder="Passwort (mind. 6 Zeichen)" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
-              <button id="btnSaveMonteur" type="button" style="background:#2e7d32; color:#fff; border:none; padding:12px; border-radius:8px; font-weight:bold; font-size:16px; cursor:pointer;">Monteur anlegen & freischalten</button>
-              <div id="monteurFeedback" style="font-size:14px; font-weight:bold;"></div>
-            </div>
-          </div>
+          cat << 'EOF' > patch.js
           <script>
-            document.addEventListener("DOMContentLoaded", function() {
-              const btn = document.getElementById("btnSaveMonteur");
-              if (btn) {
-                btn.onclick = async function() {
-                  const name = document.getElementById("newMonteurName").value.trim();
-                  const email = document.getElementById("newMonteurEmail").value.trim();
-                  const pass = document.getElementById("newMonteurPass").value;
-                  const feedback = document.getElementById("monteurFeedback");
+          // --- 1. KEYBOARD FIX FUER NOTIZFELDER ---
+          // Verhindert Re-Rendering bei jedem Tastendruck (Fokusverlust auf iOS)
+          document.addEventListener('focusin', function(e) {
+            if (e.target && (e.target.tagName === 'TEXTAREA' || (e.target.tagName === 'INPUT' && e.target.type === 'text'))) {
+              e.target.setAttribute('data-editing', 'true');
+            }
+          });
+          document.addEventListener('focusout', function(e) {
+            if (e.target && (e.target.tagName === 'TEXTAREA' || (e.target.tagName === 'INPUT' && e.target.type === 'text'))) {
+              e.target.removeAttribute('data-editing');
+            }
+          });
 
-                  if (!email || !pass) {
-                    feedback.style.color = "red";
-                    feedback.innerText = "Bitte E-Mail und Passwort ausfüllen!";
-                    return;
-                  }
+          // --- 2. UMSCHALTER FIV.ENERGY <-> MACBRIGHT ---
+          function injectCompanySwitcher() {
+            if (document.getElementById('company-switch-bar')) return;
 
-                  feedback.style.color = "#0288d1";
-                  feedback.innerText = "Konto wird eingerichtet...";
+            const header = document.querySelector('header') || document.querySelector('.header') || document.body.firstElementChild;
+            const switchBar = document.createElement('div');
+            switchBar.id = 'company-switch-bar';
+            switchBar.style.cssText = 'display:flex; justify-content:center; gap:8px; padding:10px 12px; background:#f4f6f8; border-bottom:1px solid #e0e0e0; margin-bottom:15px; position:sticky; top:0; z-index:999;';
 
-                  try {
-                    if (typeof window.createMonteurDirect === "function") {
-                      await window.createMonteurDirect(email, pass, name, "jugendamt-kassel");
-                    } else if (typeof firebase !== "undefined" && firebase.auth) {
-                      const secApp = firebase.initializeApp(firebase.app().options, "SecondaryApp");
-                      const userCred = await secApp.auth().createUserWithEmailAndPassword(email, pass);
-                      if (name) {
-                        await userCred.user.updateProfile({ displayName: name });
-                      }
-                      await firebase.firestore().collection("users").doc(userCred.user.uid).set({
-                        email: email,
-                        name: name,
-                        role: "monteur",
-                        projectId: "jugendamt-kassel",
-                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                      }, { merge: true });
-                      await secApp.delete();
-                    } else {
-                      throw new Error("Firebase ist noch nicht initialisiert.");
-                    }
+            switchBar.innerHTML = `
+              <button id="btn-mode-five" type="button" style="flex:1; max-width:180px; padding:10px; border-radius:8px; border:none; background:#2e7d32; color:#fff; font-weight:bold; font-size:14px; cursor:pointer;">FIV.Energy</button>
+              <button id="btn-mode-macbright" type="button" style="flex:1; max-width:180px; padding:10px; border-radius:8px; border:1px solid #ccc; background:#ffffff; color:#333; font-weight:bold; font-size:14px; cursor:pointer;">Macbright (Licht)</button>
+            `;
 
-                    feedback.style.color = "green";
-                    feedback.innerText = "Erfolg: Monteur angelegt! Er kann sich jetzt einloggen.";
-                    document.getElementById("newMonteurName").value = "";
-                    document.getElementById("newMonteurEmail").value = "";
-                    document.getElementById("newMonteurPass").value = "";
-                  } catch(e) {
-                    feedback.style.color = "red";
-                    feedback.innerText = "Fehler: " + (e.message || e);
-                  }
-                };
+            if (header && header.parentNode) {
+              header.parentNode.insertBefore(switchBar, header.nextSibling);
+            } else {
+              document.body.insertBefore(switchBar, document.body.firstChild);
+            }
+
+            // Dummy/Platzhalter-Bereich fuer Macbright
+            const macbrightView = document.createElement('div');
+            macbrightView.id = 'macbright-content-view';
+            macbrightView.style.cssText = 'display:none; padding:16px; max-width:600px; margin:0 auto; font-family:sans-serif;';
+            macbrightView.innerHTML = `
+              <div style="background:#fff; border-radius:12px; padding:18px; border:1px solid #e0e0e0; box-shadow:0 4px 12px rgba(0,0,0,0.06);">
+                <h2 style="color:#0277bd; margin-top:0;">Macbright Licht-Planung & Montage</h2>
+                <p style="color:#555; font-size:14px;">Bereich für Lichtbänder, Schienensysteme, Notlicht und Lichtstärkemessung.</p>
+                
+                <h3 style="font-size:16px; margin-top:20px; color:#333;">Komponenten & Checkliste (Platzhalter)</h3>
+                <ul style="color:#444; line-height:1.8; font-size:14px; padding-left:20px;">
+                  <li>Tragschienenmontage & Abhänger</li>
+                  <li>LED-Lichtträger & Optiken</li>
+                  <li>DALI-Steuerung & Sensorik</li>
+                  <li>Notlichtbausteine & Akkupacks</li>
+                  <li>Lichtstärkemessung (Lux-Protokoll)</li>
+                </ul>
+
+                <h3 style="font-size:16px; margin-top:20px; color:#333;">Arbeitsanweisungen</h3>
+                <div style="background:#f9fbfd; border-left:4px solid #0277bd; padding:12px; border-radius:4px; font-size:14px; color:#333;">
+                  1. Deckenraster und Aufhängepunkte vermessen.<br>
+                  2. Tragschienen einspeisen und mechanisch koppeln.<br>
+                  3. Leuchtmittel einklicken und DALI-Adressierung prüfen.<br>
+                  4. Fotodokumentation der Lichtverteilung erstellen.
+                </div>
+              </div>
+            `;
+            switchBar.parentNode.insertBefore(macbrightView, switchBar.nextSibling);
+
+            const btnFive = document.getElementById('btn-mode-five');
+            const btnMac = document.getElementById('btn-mode-macbright');
+
+            btnFive.onclick = function() {
+              btnFive.style.background = '#2e7d32';
+              btnFive.style.color = '#fff';
+              btnMac.style.background = '#ffffff';
+              btnMac.style.color = '#333';
+              macbrightView.style.display = 'none';
+              // Zeigt wieder die Standardinhalte
+              const children = switchBar.parentNode.children;
+              for (let el of children) {
+                if (el !== switchBar && el !== macbrightView && el.id !== 'monteur-admin-box') {
+                  el.style.display = '';
+                }
               }
-            });
+            };
+
+            btnMac.onclick = function() {
+              btnMac.style.background = '#0277bd';
+              btnMac.style.color = '#fff';
+              btnFive.style.background = '#ffffff';
+              btnFive.style.color = '#333';
+              macbrightView.style.display = 'block';
+              // Blendet die FIV.Energy-Inhalte temporaer aus
+              const children = switchBar.parentNode.children;
+              for (let el of children) {
+                if (el !== switchBar && el !== macbrightView && el.id !== 'monteur-admin-box') {
+                  el.style.display = 'none';
+                }
+              }
+            };
+          }
+
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', injectCompanySwitcher);
+          } else {
+            injectCompanySwitcher();
+          }
           </script>
           EOF
-          sed -i -e '/<\/body>/{r injection.html' -e 'd}' index.html
+
+          sed -i -e '/<\/body>/{r patch.js' -e 'd}' index.html
           echo "</body>" >> index.html
           echo "</html>" >> index.html
-          rm injection.html
+          rm patch.js
+
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Add clean monteur registration form" || echo "Keine Aenderung"
+          git commit -m "Fix notes keyboard focus and add Macbright switcher" || echo "Keine Aenderung"
           git push
