@@ -1,4 +1,4 @@
-name: Fix Teams Form Isolation and Inspect Details
+name: Fix Monteur Form and Add Delete Button
 
 on:
   workflow_dispatch:
@@ -7,66 +7,70 @@ permissions:
   contents: write
 
 jobs:
-  fix-and-inspect:
+  fix-monteur:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Monteur-Formular isolieren und nur im Teams-Tab anzeigen
+      - name: Monteur-Formular nur in Teams anzeigen und Loesch-Button hinzufuegen
         run: |
           python3 -c '
           with open("index.html", "r", encoding="utf-8") as f:
               content = f.read()
 
-          # Monteur-Box in einen festen Container packen oder per CSS/ID kapseln
-          if "Neuen Monteur anlegen" in content:
-              # Falls die Box statisch im Body liegt, ID zuweisen und standardmaessig ausblenden
-              import re
-              content = re.sub(
-                  r"(<div[^>]*?>\s*<h\d[^>]*?>\s*Neuen Monteur anlegen|<h3>\s*Neuen Monteur anlegen|<div class=\"card\"[^>]*?>\s*<h\d>Neuen Monteur anlegen)",
-                  r"<div id=\"monteur-create-box\" style=\"display:none;\">\1",
-                  content,
-                  count=1
-              )
+          # 1. Entfernen-Button in der Team-Liste rendern
+          old_team_render = r"""${esc(t)}</div>\`).join("");"""
+          new_team_render = r"""<span style="font-weight:600;">${esc(t)}</span><button class="btn" style="background:#ef4444; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px;" onclick="removeTeamMember(\x27${esc(t)}\x27)">Entfernen</button></div>\`).join("");"""
 
-          # JS-Hook: Monteur-Box nur anzeigen, wenn Teams aktiv ist
-          tab_hook = """
+          if """${esc(t)}</div>`).join("");""" in content:
+              content = content.replace("""${esc(t)}</div>`).join("");""", """<div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid #eee;"><span>${esc(t)}</span><button class="btn" style="background:#ef4444; color:#fff; padding:4px 10px; font-size:12px; border-radius:6px; cursor:pointer;" onclick="removeTeamMember(\x27${esc(t)}\x27)">Entfernen</button></div>`).join("");""")
+
+          # 2. JS-Funktion zum Entfernen eines Monteurs einbetten
+          remove_fn = """
           <script>
-          function updateMonteurBoxVisibility() {
-            const box = document.getElementById("monteur-create-box");
-            if (!box) return;
-            const currentHash = window.location.hash || "";
-            const teamsActive = currentHash.includes("teams") || document.body.dataset.activeTab === "teams";
-            box.style.display = teamsActive ? "block" : "none";
-          }
-          window.addEventListener("hashchange", updateMonteurBoxVisibility);
-          setInterval(updateMonteurBoxVisibility, 500);
+          window.removeTeamMember = async function(memberName) {
+            if (!confirm(`Möchtest du Monteur "${memberName}" wirklich aus dem Team entfernen?`)) return;
+            try {
+              let proj = p();
+              if (!proj || !proj.id) return;
+              let updatedTeams = (proj.teams || []).filter(t => t !== memberName);
+              await fsProjects().doc(proj.id).update({ teams: updatedTeams });
+              if (typeof toast === "function") toast("Monteur entfernt");
+            } catch (err) {
+              console.error("Fehler beim Entfernen:", err);
+              alert("Fehler beim Entfernen des Monteurs: " + err.message);
+            }
+          };
           </script>
           </body>"""
 
-          if "</body>" in content and "updateMonteurBoxVisibility" not in content:
-              content = content.replace("</body>", tab_hook)
+          if "</body>" in content and "window.removeTeamMember" not in content:
+              content = content.replace("</body>", remove_fn)
+
+          # 3. Monteur-Kasten zwingend an den Tab "teams" binden per CSS-Klasse
+          # Wir suchen den Container mit 'Neuen Monteur anlegen' und verpassen ihm eine eindeutige CSS-Kopplung
+          import re
+          content = re.sub(
+              r"(<div[^>]*?>)(\s*<h\d[^>]*?>\s*Neuen Monteur anlegen)",
+              r"""\1\2<style>#monteur-box-wrapper{display:none;} body[data-tab="teams"] #monteur-box-wrapper, .tab-teams #monteur-box-wrapper{display:block !important;}</style>""",
+              content,
+              count=1
+          )
 
           with open("index.html", "w", encoding="utf-8") as f:
               f.write(content)
           '
 
-      - name: Code von Teams und Foto-Logik inspizieren
+      - name: Genaue Tab-Umschaltung in index.html pruefen
         run: |
-          echo "=== GENAUE LOCATION VON NEUEN MONTEUR ANLEGEN ==="
-          grep -n -C 8 "Neuen Monteur anlegen" index.html || true
-
-          echo "=== TEAM-LISTE UND MONTEUR-VERWALTUNG ==="
-          grep -n -C 8 "wfTeam\|renderTeam" index.html || true
-
-          echo "=== FOTO-LOGIK (wfPhotoInput) ==="
-          grep -n -A 25 "function wfPhotoInput" index.html || true
+          echo "=== TAB WECHSEL LOGIK ==="
+          grep -n -C 5 "function showTab\|function switchTab\|setTab" index.html || true
 
       - name: Aenderungen speichern
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Isolate monteur box and inspect photo and team logic" || echo "Keine Aenderung"
+          git commit -m "Add delete button for team members and inspect tab switcher" || echo "Keine Aenderung"
           git push
