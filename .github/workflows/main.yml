@@ -1,4 +1,4 @@
-name: Replace Team Input
+name: Fix Safari Login Hang
 
 on:
   workflow_dispatch:
@@ -7,64 +7,18 @@ permissions:
   contents: write
 
 jobs:
-  replace:
+  fix-login:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Formular an Zeile 64 ersetzen
+      - name: Firestore offline persistence deaktivieren
         run: |
-          cat << 'EOF' > replacement.html
-          <label>Neuen Monteur-Account erstellen</label>
-          <div style="display:flex; flex-direction:column; gap:8px; margin-top:8px;">
-            <input id="monteurName" placeholder="Name des Monteurs" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
-            <input id="monteurEmail" type="email" placeholder="E-Mail-Adresse" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
-            <input id="monteurPassword" type="password" placeholder="Passwort (mind. 6 Zeichen)" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
-            <button class="btn green" id="btnCreateMonteurAccount" type="button" style="margin-top:6px; padding:12px; font-weight:bold;">Monteur anlegen & freischalten</button>
-            <div id="monteurStatusMsg" style="font-size:14px; font-weight:bold; margin-top:6px;"></div>
-          </div>
-          <script>
-            window.addEventListener("load", function() {
-              const btn = document.getElementById("btnCreateMonteurAccount");
-              if (btn) {
-                btn.onclick = async function() {
-                  const name = document.getElementById("monteurName").value.trim();
-                  const email = document.getElementById("monteurEmail").value.trim();
-                  const pass = document.getElementById("monteurPassword").value;
-                  const status = document.getElementById("monteurStatusMsg");
-
-                  if (!email || !pass) {
-                    status.style.color = "red";
-                    status.innerText = "Bitte E-Mail und Passwort eingeben!";
-                    return;
-                  }
-
-                  status.style.color = "blue";
-                  status.innerText = "Konto wird angelegt...";
-
-                  try {
-                    const projId = "jugendamt-kassel";
-                    await window.createMonteurDirect(email, pass, name, projId);
-                    status.style.color = "green";
-                    status.innerText = "Erfolg: Monteur angelegt! Er kann sich jetzt anmelden.";
-                    document.getElementById("monteurName").value = "";
-                    document.getElementById("monteurEmail").value = "";
-                    document.getElementById("monteurPassword").value = "";
-                  } catch(err) {
-                    status.style.color = "red";
-                    status.innerText = "Fehler: " + (err.message || err);
-                  }
-                };
-              }
-            });
-          </script>
-          EOF
-          sed -i 's|<label>Neues Team / Monteur</label>.*<button class="btn green" id="addTeam"[^>]*>Hinzufügen</button></div>|__REPLACE_HERE__|g' index.html
-          sed -i -e '/__REPLACE_HERE__/{r replacement.html' -e 'd}' index.html
-          rm replacement.html
+          sed -i 's|enableIndexedDbPersistence|// enableIndexedDbPersistence|g' index.html
+          sed -i 's|enableMultiTabIndexedDbPersistence|// enableMultiTabIndexedDbPersistence|g' index.html
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "UI: Monteur-Formular fest eingefuegt" || echo "Keine Aenderungen"
+          git commit -m "Fix: IndexedDb persistence fuer Safari deaktiviert" || echo "Keine Aenderungen"
           git push
