@@ -1,4 +1,4 @@
-name: Inspect Firebase and Tabs
+name: Apply Teams Fix and State Retention
 
 on:
   workflow_dispatch:
@@ -7,22 +7,103 @@ permissions:
   contents: write
 
 jobs:
-  inspect:
+  apply-fixes:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Firestore Referenzen und Tab Navigation pruefen
+      - name: Code patchen
         run: |
-          echo "=== FIRESTORE FUNKTIONEN (fs...) ==="
-          grep -n "function fs" index.html || true
+          cat << 'EOF' > patch.py
+          with open("index.html", "r", encoding="utf-8") as f:
+              content = f.read()
 
-          echo "=== WIE WERDEN TEAMS GESPEICHERT / HINZUGEFUEGT ==="
-          grep -n -C 6 "teams" index.html | grep -C 5 "update\|push\|add" || true
+          import re
 
-          echo "=== REITER / TAB WECHSEL LOGIK ==="
-          grep -n -C 6 "function nav(" index.html || grep -n -C 6 "function showView" index.html || grep -n -C 6 "function setTab" index.html || true
+          # 1. Korrektur: Loesch-Funktion nutzt das korrekte fsProject()
+          content = content.replace("fsProjects().doc(proj.id)", "fsProject()")
+          content = content.replace("fsProjects()", "fsProject()")
 
-          echo "=== DIE LETZTEN 60 ZEILEN VOR BODY ENDE ==="
-          tail -n 60 index.html
+          # 2. Raum-Status bei Re-Rendering (render()) beibehalten:
+          # Wir faedeln vor dem Neu-Rendern das Merken der offenen Details ein und stellen sie danach wieder her.
+          render_hook_old = "function render(){"
+          render_hook_new = """function render(){\n  let openDetails = new Set();\n  document.querySelectorAll("details[open]").forEach(d => {\n    if (d.id) openDetails.add(d.id);\n    let summary = d.querySelector("summary");\n    if (summary) openDetails.add(summary.textContent.trim());\n  });"""
+          
+          if render_hook_old in content and "let openDetails = new Set();" not in content:
+              content = content.replace(render_hook_old, render_hook_new, 1)
+
+          # Nach dem Rendern offenen Zustand wiederherstellen
+          restore_hook = """
+          setTimeout(() => {
+            document.querySelectorAll("details").forEach(d => {
+              let summary = d.querySelector("summary");
+              if ((d.id && openDetails.has(d.id)) || (summary && openDetails.has(summary.textContent.trim()))) {
+                d.open = true;
+              }
+            });
+          }, 0);
+          """
+          # Platzieren vor dem Ende von render() falls auffindbar, oder ueber MutationObserver
+          state_preserver = """
+          <script id="preserve-rooms-state">
+          let globalOpenRooms = new Set();
+          document.addEventListener("toggle", function(e) {
+            if (e.target.tagName === "DETAILS") {
+              let title = e.target.querySelector("summary")?.innerText?.trim();
+              if (!title) return;
+              if (e.target.open) {
+                globalOpenRooms.add(title);
+              } else {
+                globalOpenRooms.delete(title);
+              }
+            }
+          }, true);
+
+          const roomObserver = new MutationObserver(() => {
+            document.querySelectorAll("details").forEach(d => {
+              let title = d.querySelector("summary")?.innerText?.trim();
+              if (title && globalOpenRooms.has(title) && !d.open) {
+                d.open = true;
+              }
+            });
+          });
+          window.addEventListener("DOMContentLoaded", () => {
+            roomObserver.observe(document.body, { childList: true, subtree: true });
+          });
+          </script>
+          """
+          if "preserve-rooms-state" not in content and "</body>" in content:
+              content = content.replace("</body>", state_preserver + "\n</body>")
+
+          # 3. Monteur-Kasten zwingend physikalisch in den Teams-View verschieben
+          # Falls er am Ende vor </body> steht, schneiden wir ihn aus und haengen ihn an teamList
+          card_regex = r"(<div[^>]*id=\"monteur-register-card\"[^>]*>[\s\S]*?<\/button>\s*(?:<div[^>]*id=[\"']\w+Error[\"'][^>]*><\/div>)?\s*<\/div>\s*<\/div>|<div[^>]*class=[\"'][^\"']*card[^\"']*[\"'][^>]*>\s*<h\d[^>]*>\s*Neuen Monteur anlegen[\s\S]*?<\/button>\s*(?:<div[^>]*id=[\"']\w+Error[\"'][^>]*><\/div>)?\s*<\/div>)"
+          card_match = re.search(card_regex, content)
+          if card_match:
+              card_html = card_match.group(1)
+              content = content.replace(card_html, "")
+              
+              # Bereinigen und in einen sauberen Container packen
+              wrapped_card = f'<div id="monteur-custom-container" style="margin-top:20px;">{card_html}</div>'
+              
+              # An die teamList anhaengen
+              if 'id="teamList"' in content:
+                  content = content.replace('id="teamList"></div>', f'id="teamList"></div>\n{wrapped_card}')
+              elif 'id="teamList"' in content:
+                  content = re.sub(r'(<div[^>]*id=[\"']teamList[\"'][^>]*>[\s\S]*?<\/div>)', r'\1\n' + wrapped_card, content, count=1)
+
+          with open("index.html", "w", encoding="utf-8") as f:
+              f.write(content)
+          EOF
+
+          python3 patch.py
+          rm patch.py
+
+      - name: Aenderungen speichern
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add index.html
+          git commit -m "Fix delete action, isolate register box, preserve opened room state" || echo "Keine Aenderung"
+          git push
