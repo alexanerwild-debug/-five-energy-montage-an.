@@ -1,4 +1,4 @@
-name: Fix Monteur Form and Add Delete Button
+name: Fix Teams UI and Tab Isolation
 
 on:
   workflow_dispatch:
@@ -7,70 +7,111 @@ permissions:
   contents: write
 
 jobs:
-  fix-monteur:
+  fix-teams-ui:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Monteur-Formular nur in Teams anzeigen und Loesch-Button hinzufuegen
+      - name: Team-Loeschbutton einbauen und Monteur-Kasten strikt an Teams-Tab binden
         run: |
           python3 -c '
           with open("index.html", "r", encoding="utf-8") as f:
               content = f.read()
 
-          # 1. Entfernen-Button in der Team-Liste rendern
-          old_team_render = r"""${esc(t)}</div>\`).join("");"""
-          new_team_render = r"""<span style="font-weight:600;">${esc(t)}</span><button class="btn" style="background:#ef4444; color:#fff; padding:4px 8px; font-size:12px; border-radius:6px;" onclick="removeTeamMember(\x27${esc(t)}\x27)">Entfernen</button></div>\`).join("");"""
+          import re
 
-          if """${esc(t)}</div>`).join("");""" in content:
-              content = content.replace("""${esc(t)}</div>`).join("");""", """<div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid #eee;"><span>${esc(t)}</span><button class="btn" style="background:#ef4444; color:#fff; padding:4px 10px; font-size:12px; border-radius:6px; cursor:pointer;" onclick="removeTeamMember(\x27${esc(t)}\x27)">Entfernen</button></div>`).join("");""")
+          # 1. Entfernen-Button zu jedem Team-Eintrag in teamList hinzufuegen
+          # Suche nach der Zuweisung teamList.innerHTML = ...
+          content = re.sub(
+              r"(\$\(\"teamList\"\)\.innerHTML\s*=\s*x\.teams\.map\(t\s*=>\s*`)(<div[^>]*?>)(\$\{esc\(t\)\})(</div>`\)\.join\(\"\"\);)",
+              r"""\1<div style="display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid #eee;"><span>\3</span><button type="button" class="btn" style="background:#ef4444; color:#fff; padding:4px 10px; font-size:12px; border-radius:6px; cursor:pointer;" onclick="removeTeamMember(\x27\${esc(t)}\x27)">Entfernen</button></div>`).join("");""",
+              content
+          )
 
-          # 2. JS-Funktion zum Entfernen eines Monteurs einbetten
-          remove_fn = """
+          # Falls die Kurzform ohne Escaping oder inline vorhanden ist:
+          if "removeTeamMember" not in content:
+              content = content.replace(
+                  """padding:9px 0;border-bottom:1px solid #eee">${esc(t)}</div>`,
+                  """display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid #eee"><span>${esc(t)}</span><button type="button" class="btn" style="background:#ef4444; color:#fff; padding:4px 10px; font-size:12px; border-radius:6px; cursor:pointer;" onclick="removeTeamMember(\x27${esc(t)}\x27)">Entfernen</button></div>`"""
+              )
+
+          # 2. Funktion zum Entfernen aus x.teams (Firestore Update) bereitstellen
+          remove_script = """
           <script>
-          window.removeTeamMember = async function(memberName) {
-            if (!confirm(`Möchtest du Monteur "${memberName}" wirklich aus dem Team entfernen?`)) return;
+          window.removeTeamMember = async function(name) {
+            if (!confirm(`Möchtest du "${name}" wirklich entfernen?`)) return;
             try {
-              let proj = p();
+              let proj = (typeof p === "function") ? p() : null;
               if (!proj || !proj.id) return;
-              let updatedTeams = (proj.teams || []).filter(t => t !== memberName);
-              await fsProjects().doc(proj.id).update({ teams: updatedTeams });
+              let currentTeams = proj.teams || [];
+              let updated = currentTeams.filter(t => t !== name);
+              await fsProjects().doc(proj.id).update({ teams: updated });
               if (typeof toast === "function") toast("Monteur entfernt");
-            } catch (err) {
-              console.error("Fehler beim Entfernen:", err);
-              alert("Fehler beim Entfernen des Monteurs: " + err.message);
+            } catch (e) {
+              console.error(e);
+              alert("Fehler beim Entfernen: " + e.message);
             }
           };
           </script>
-          </body>"""
+          """
+          if "window.removeTeamMember" not in content and "</body>" in content:
+              content = content.replace("</body>", remove_script + "\n</body>")
 
-          if "</body>" in content and "window.removeTeamMember" not in content:
-              content = content.replace("</body>", remove_fn)
-
-          # 3. Monteur-Kasten zwingend an den Tab "teams" binden per CSS-Klasse
-          # Wir suchen den Container mit 'Neuen Monteur anlegen' und verpassen ihm eine eindeutige CSS-Kopplung
-          import re
+          # 3. Monteur-Kasten finden und in einen Container packen, der NUR im Teams-View gerendert wird
+          # Wir kapseln den Kasten 'Neuen Monteur anlegen'
           content = re.sub(
-              r"(<div[^>]*?>)(\s*<h\d[^>]*?>\s*Neuen Monteur anlegen)",
-              r"""\1\2<style>#monteur-box-wrapper{display:none;} body[data-tab="teams"] #monteur-box-wrapper, .tab-teams #monteur-box-wrapper{display:block !important;}</style>""",
-              content,
-              count=1
+              r"(<div[^>]*class=[\"'][^\"']*card[^\"']*[\"'][^>]*>\s*<h\d[^>]*>\s*Neuen Monteur anlegen[\s\S]*?<\/button>\s*(?:<div[^>]*id=[\"']\w+Error[\"'][^>]*><\/div>)?\s*<\/div>)",
+              r"""<div id="monteur-register-card" class="only-on-teams">\1</div>""",
+              content
           )
+
+          # CSS ergaenzen: only-on-teams standardmaessig ausblenden, ausser im Tab/View "teams"
+          isolation_css = """
+          <style id="teams-isolation-style">
+            #monteur-register-card, .only-on-teams {
+              display: none !important;
+            }
+            #viewTeams #monteur-register-card,
+            #viewTeams .only-on-teams,
+            .active-view-teams #monteur-register-card,
+            .active-view-teams .only-on-teams,
+            [data-tab="teams"] #monteur-register-card,
+            [data-tab="teams"] .only-on-teams {
+              display: block !important;
+            }
+          </style>
+          </head>"""
+          if "</head>" in content and "teams-isolation-style" not in content:
+              content = content.replace("</head>", isolation_css)
+
+          # Tab-Wechsel beobachten: Wenn viewTeams sichtbar ist, Klasse auf den Body legen
+          tab_observer = """
+          <script>
+          function syncTeamsCard() {
+            const vt = document.getElementById("viewTeams") || document.querySelector("[id*=\"Teams\" i]");
+            const card = document.getElementById("monteur-register-card");
+            if (!card) return;
+            if (vt && window.getComputedStyle(vt).display !== "none") {
+              card.style.setProperty("display", "block", "important");
+            } else {
+              card.style.setProperty("display", "none", "important");
+            }
+          }
+          setInterval(syncTeamsCard, 300);
+          </script>
+          """
+          if "syncTeamsCard" not in content and "</body>" in content:
+              content = content.replace("</body>", tab_observer + "\n</body>")
 
           with open("index.html", "w", encoding="utf-8") as f:
               f.write(content)
           '
-
-      - name: Genaue Tab-Umschaltung in index.html pruefen
-        run: |
-          echo "=== TAB WECHSEL LOGIK ==="
-          grep -n -C 5 "function showTab\|function switchTab\|setTab" index.html || true
 
       - name: Aenderungen speichern
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Add delete button for team members and inspect tab switcher" || echo "Keine Aenderung"
+          git commit -m "Add delete button for team list and isolate monteur box to teams tab" || echo "Keine Aenderung"
           git push
