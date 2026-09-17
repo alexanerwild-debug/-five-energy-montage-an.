@@ -1,32 +1,21 @@
-name: Inspect And Clean Notebox
+name: Find Notes Function
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  clean-and-inspect:
+  find-notes:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Fehlerhaften Switcher entfernen
+      - name: JS-Code fuer Notizen finden
         run: |
-          # Entfernt den injizierten Switcher-Code sauber aus index.html
-          sed -i '/company-switch-bar/d' index.html || true
-          sed -i '/macbright-content-view/d' index.html || true
-          sed -i '/btn-mode-macbright/d' index.html || true
-
-          # Sucht nach dem Notizen-Eventlistener im Code
-          echo "=== SUCHE NACH NOTIZEN CODE ==="
-          grep -n -C 5 -i "notiz" index.html | head -n 40 || true
-          grep -n -C 5 -i "oninput" index.html | head -n 40 || true
-
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add index.html
-          git commit -m "Cleanup switcher overlay" || echo "Keine Aenderung"
-          git push
+          echo "=== SUCHE NACH NOTIZ-FUNKTIONEN IM SCRIPT ==="
+          grep -n -C 10 -i "notiz" index.html | grep -E "(function|addEventListener|input|render)" -C 3 || true
+          echo "=== SUCHE NACH TEXTAREA EVENT HIER ==="
+          grep -n -C 10 "<textarea" index.html || true
