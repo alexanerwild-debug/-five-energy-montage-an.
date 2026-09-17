@@ -1,4 +1,4 @@
-name: Fix Notes Keyboard and Add Macbright Switcher
+name: Inspect And Clean Notebox
 
 on:
   workflow_dispatch:
@@ -7,127 +7,26 @@ permissions:
   contents: write
 
 jobs:
-  apply-updates:
+  clean-and-inspect:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Tastatur-Fix und Macbright Umschalter einbauen
+      - name: Fehlerhaften Switcher entfernen
         run: |
-          cat << 'EOF' > patch.js
-          <script>
-          // --- 1. KEYBOARD FIX FUER NOTIZFELDER ---
-          // Verhindert Re-Rendering bei jedem Tastendruck (Fokusverlust auf iOS)
-          document.addEventListener('focusin', function(e) {
-            if (e.target && (e.target.tagName === 'TEXTAREA' || (e.target.tagName === 'INPUT' && e.target.type === 'text'))) {
-              e.target.setAttribute('data-editing', 'true');
-            }
-          });
-          document.addEventListener('focusout', function(e) {
-            if (e.target && (e.target.tagName === 'TEXTAREA' || (e.target.tagName === 'INPUT' && e.target.type === 'text'))) {
-              e.target.removeAttribute('data-editing');
-            }
-          });
+          # Entfernt den injizierten Switcher-Code sauber aus index.html
+          sed -i '/company-switch-bar/d' index.html || true
+          sed -i '/macbright-content-view/d' index.html || true
+          sed -i '/btn-mode-macbright/d' index.html || true
 
-          // --- 2. UMSCHALTER FIV.ENERGY <-> MACBRIGHT ---
-          function injectCompanySwitcher() {
-            if (document.getElementById('company-switch-bar')) return;
-
-            const header = document.querySelector('header') || document.querySelector('.header') || document.body.firstElementChild;
-            const switchBar = document.createElement('div');
-            switchBar.id = 'company-switch-bar';
-            switchBar.style.cssText = 'display:flex; justify-content:center; gap:8px; padding:10px 12px; background:#f4f6f8; border-bottom:1px solid #e0e0e0; margin-bottom:15px; position:sticky; top:0; z-index:999;';
-
-            switchBar.innerHTML = `
-              <button id="btn-mode-five" type="button" style="flex:1; max-width:180px; padding:10px; border-radius:8px; border:none; background:#2e7d32; color:#fff; font-weight:bold; font-size:14px; cursor:pointer;">FIV.Energy</button>
-              <button id="btn-mode-macbright" type="button" style="flex:1; max-width:180px; padding:10px; border-radius:8px; border:1px solid #ccc; background:#ffffff; color:#333; font-weight:bold; font-size:14px; cursor:pointer;">Macbright (Licht)</button>
-            `;
-
-            if (header && header.parentNode) {
-              header.parentNode.insertBefore(switchBar, header.nextSibling);
-            } else {
-              document.body.insertBefore(switchBar, document.body.firstChild);
-            }
-
-            // Dummy/Platzhalter-Bereich fuer Macbright
-            const macbrightView = document.createElement('div');
-            macbrightView.id = 'macbright-content-view';
-            macbrightView.style.cssText = 'display:none; padding:16px; max-width:600px; margin:0 auto; font-family:sans-serif;';
-            macbrightView.innerHTML = `
-              <div style="background:#fff; border-radius:12px; padding:18px; border:1px solid #e0e0e0; box-shadow:0 4px 12px rgba(0,0,0,0.06);">
-                <h2 style="color:#0277bd; margin-top:0;">Macbright Licht-Planung & Montage</h2>
-                <p style="color:#555; font-size:14px;">Bereich für Lichtbänder, Schienensysteme, Notlicht und Lichtstärkemessung.</p>
-                
-                <h3 style="font-size:16px; margin-top:20px; color:#333;">Komponenten & Checkliste (Platzhalter)</h3>
-                <ul style="color:#444; line-height:1.8; font-size:14px; padding-left:20px;">
-                  <li>Tragschienenmontage & Abhänger</li>
-                  <li>LED-Lichtträger & Optiken</li>
-                  <li>DALI-Steuerung & Sensorik</li>
-                  <li>Notlichtbausteine & Akkupacks</li>
-                  <li>Lichtstärkemessung (Lux-Protokoll)</li>
-                </ul>
-
-                <h3 style="font-size:16px; margin-top:20px; color:#333;">Arbeitsanweisungen</h3>
-                <div style="background:#f9fbfd; border-left:4px solid #0277bd; padding:12px; border-radius:4px; font-size:14px; color:#333;">
-                  1. Deckenraster und Aufhängepunkte vermessen.<br>
-                  2. Tragschienen einspeisen und mechanisch koppeln.<br>
-                  3. Leuchtmittel einklicken und DALI-Adressierung prüfen.<br>
-                  4. Fotodokumentation der Lichtverteilung erstellen.
-                </div>
-              </div>
-            `;
-            switchBar.parentNode.insertBefore(macbrightView, switchBar.nextSibling);
-
-            const btnFive = document.getElementById('btn-mode-five');
-            const btnMac = document.getElementById('btn-mode-macbright');
-
-            btnFive.onclick = function() {
-              btnFive.style.background = '#2e7d32';
-              btnFive.style.color = '#fff';
-              btnMac.style.background = '#ffffff';
-              btnMac.style.color = '#333';
-              macbrightView.style.display = 'none';
-              // Zeigt wieder die Standardinhalte
-              const children = switchBar.parentNode.children;
-              for (let el of children) {
-                if (el !== switchBar && el !== macbrightView && el.id !== 'monteur-admin-box') {
-                  el.style.display = '';
-                }
-              }
-            };
-
-            btnMac.onclick = function() {
-              btnMac.style.background = '#0277bd';
-              btnMac.style.color = '#fff';
-              btnFive.style.background = '#ffffff';
-              btnFive.style.color = '#333';
-              macbrightView.style.display = 'block';
-              // Blendet die FIV.Energy-Inhalte temporaer aus
-              const children = switchBar.parentNode.children;
-              for (let el of children) {
-                if (el !== switchBar && el !== macbrightView && el.id !== 'monteur-admin-box') {
-                  el.style.display = 'none';
-                }
-              }
-            };
-          }
-
-          if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', injectCompanySwitcher);
-          } else {
-            injectCompanySwitcher();
-          }
-          </script>
-          EOF
-
-          sed -i -e '/<\/body>/{r patch.js' -e 'd}' index.html
-          echo "</body>" >> index.html
-          echo "</html>" >> index.html
-          rm patch.js
+          # Sucht nach dem Notizen-Eventlistener im Code
+          echo "=== SUCHE NACH NOTIZEN CODE ==="
+          grep -n -C 5 -i "notiz" index.html | head -n 40 || true
+          grep -n -C 5 -i "oninput" index.html | head -n 40 || true
 
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Fix notes keyboard focus and add Macbright switcher" || echo "Keine Aenderung"
+          git commit -m "Cleanup switcher overlay" || echo "Keine Aenderung"
           git push
