@@ -1,4 +1,4 @@
-name: Fix Teams UI and Tab Isolation
+name: Inspect Firebase and Tabs
 
 on:
   workflow_dispatch:
@@ -7,91 +7,22 @@ permissions:
   contents: write
 
 jobs:
-  fix-teams-ui:
+  inspect:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Python-Skript ausfuehren
+      - name: Firestore Referenzen und Tab Navigation pruefen
         run: |
-          cat << 'EOF' > patch.py
-          with open("index.html", "r", encoding="utf-8") as f:
-              content = f.read()
+          echo "=== FIRESTORE FUNKTIONEN (fs...) ==="
+          grep -n "function fs" index.html || true
 
-          # 1. Entfernen-Button fuer die Team-Liste ergaenzen
-          target_team = '${esc(t)}</div>`).join("");'
-          replace_team = '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee;"><span>${esc(t)}</span><button type="button" class="btn" style="background:#ef4444;color:#fff;padding:4px 10px;font-size:12px;border-radius:6px;cursor:pointer;" onclick="removeTeamMember(\'${esc(t)}\')">Entfernen</button></div>`).join("");'
+          echo "=== WIE WERDEN TEAMS GESPEICHERT / HINZUGEFUEGT ==="
+          grep -n -C 6 "teams" index.html | grep -C 5 "update\|push\|add" || true
 
-          if target_team in content:
-              content = content.replace(target_team, replace_team, 1)
+          echo "=== REITER / TAB WECHSEL LOGIK ==="
+          grep -n -C 6 "function nav(" index.html || grep -n -C 6 "function showView" index.html || grep -n -C 6 "function setTab" index.html || true
 
-          # 2. JS-Funktion zum Entfernen einbetten
-          remove_script = """
-          <script>
-          window.removeTeamMember = async function(name) {
-            if (!confirm('Möchtest du "' + name + '" wirklich entfernen?')) return;
-            try {
-              let proj = (typeof p === "function") ? p() : null;
-              if (!proj || !proj.id) return;
-              let currentTeams = proj.teams || [];
-              let updated = currentTeams.filter(t => t !== name);
-              await fsProjects().doc(proj.id).update({ teams: updated });
-              if (typeof toast === "function") toast("Monteur entfernt");
-            } catch (e) {
-              console.error(e);
-              alert("Fehler beim Entfernen: " + e.message);
-            }
-          };
-          </script>
-          """
-          if "window.removeTeamMember" not in content and "</body>" in content:
-              content = content.replace("</body>", remove_script + "\n</body>")
-
-          # 3. Monteur-Kasten finden und ueber Styles/IDs kapseln
-          import re
-          content = re.sub(
-              r"(<div[^>]*class=[\"'][^\"']*card[^\"']*[\"'][^>]*>\s*<h\d[^>]*>\s*Neuen Monteur anlegen)",
-              r'<div id="monteur-register-card">\1',
-              content,
-              count=1
-          )
-
-          # Kapsel-CSS und Sichtbarkeits-Observer ergaenzen
-          isolation_block = """
-          <style id="teams-isolation-style">
-            #monteur-register-card {
-              display: none;
-            }
-          </style>
-          <script>
-          function checkMonteurVisibility() {
-            const card = document.getElementById("monteur-register-card");
-            if (!card) return;
-            const teamsView = document.getElementById("viewTeams") || document.querySelector("[id*='Teams' i]");
-            if (teamsView && window.getComputedStyle(teamsView).display !== "none") {
-              card.style.display = "block";
-            } else {
-              card.style.display = "none";
-            }
-          }
-          setInterval(checkMonteurVisibility, 250);
-          </script>
-          """
-          if "teams-isolation-style" not in content and "</head>" in content:
-              content = content.replace("</head>", isolation_block + "\n</head>")
-
-          with open("index.html", "w", encoding="utf-8") as f:
-              f.write(content)
-          EOF
-
-          python3 patch.py
-          rm patch.py
-
-      - name: Aenderungen speichern
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add index.html
-          git commit -m "Safely isolate monteur form and add delete button" || echo "Keine Aenderung"
-          git push
+          echo "=== DIE LETZTEN 60 ZEILEN VOR BODY ENDE ==="
+          tail -n 60 index.html
