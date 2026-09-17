@@ -1,21 +1,73 @@
-name: Find Notes Function
+name: Fix Keyboard Focus and Add Clean Menu Switcher
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  find-notes:
+  apply-fixes:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: JS-Code fuer Notizen finden
+      - name: Tastatur-Bug beheben und Macbright-Umschalter ins Seitenmenue einsetzen
         run: |
-          echo "=== SUCHE NACH NOTIZ-FUNKTIONEN IM SCRIPT ==="
-          grep -n -C 10 -i "notiz" index.html | grep -E "(function|addEventListener|input|render)" -C 3 || true
-          echo "=== SUCHE NACH TEXTAREA EVENT HIER ==="
-          grep -n -C 10 "<textarea" index.html || true
+          # 1. Tastatur-Bugfix: oninput bei Notizfeldern durch onchange/onblur ersetzen, damit kein Tastaturverlust auftritt
+          sed -i 's/oninput="wfSet/onchange="wfSet/g' index.html
+          sed -i 's/oninput="setNotiz/onchange="setNotiz/g' index.html
+
+          # 2. Umschalter FIV.Energy / Macbright direkt im linken Seitenmenue statt als Stoerbalken platzieren
+          cat << 'EOF' > menu_patch.py
+          with open("index.html", "r", encoding="utf-8") as f:
+              content = f.read()
+
+          # Ersetzt den starren Titel im Menue durch ein sauberes Dropdown
+          old_nav = '<div class="navTitle">FIV.Energy</div>'
+          new_nav = '''<div class="navTitle" style="padding:10px 0;">
+            <select id="companyModeSelect" onchange="window.switchCompanyMode && window.switchCompanyMode(this.value)" style="width:100%; padding:8px; border-radius:6px; background:#1b2430; color:#fff; font-weight:bold; border:1px solid #4a5568; font-size:14px;">
+              <option value="five-energy">⚡ FIV.Energy</option>
+              <option value="macbright">💡 Macbright (Licht)</option>
+            </select>
+          </div>'''
+
+          if old_nav in content:
+              content = content.replace(old_nav, new_nav, 1)
+
+          # Fuegt Logik fuer den Modus-Wechsel vor dem schliessenden Body ein
+          script_insert = '''<script>
+          window.switchCompanyMode = function(mode) {
+            localStorage.setItem("selectedCompanyMode", mode);
+            const titleEl = document.getElementById("dashTitle");
+            if (titleEl) {
+              titleEl.innerText = mode === "macbright" ? "Macbright Licht-Planung" : "Dashboard FIV.Energy";
+            }
+          };
+          document.addEventListener("DOMContentLoaded", function() {
+            const saved = localStorage.getItem("selectedCompanyMode");
+            const sel = document.getElementById("companyModeSelect");
+            if (saved && sel) {
+              sel.value = saved;
+              window.switchCompanyMode(saved);
+            }
+          });
+          </script>
+          </body>'''
+
+          if "</body>" in content and "window.switchCompanyMode" not in content:
+              content = content.replace("</body>", script_insert, 1)
+
+          with open("index.html", "w", encoding="utf-8") as f:
+              f.write(content)
+          EOF
+
+          python3 menu_patch.py
+          rm menu_patch.py
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add index.html
+          git commit -m "Fix textarea keyboard focus and add sidebar company switcher" || echo "Keine Aenderung"
+          git push
