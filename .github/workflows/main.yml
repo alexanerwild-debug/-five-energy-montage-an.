@@ -1,4 +1,4 @@
-name: Patch index.html
+name: Hook createMonteur
 
 on:
   workflow_dispatch:
@@ -7,17 +7,17 @@ permissions:
   contents: write
 
 jobs:
-  patch:
+  hook:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: create-monteur.js in index.html einbinden
+      - name: Aufruf auf window.createMonteurDirect umleiten
         run: |
-          sed -i 's|</body>|<script src="create-monteur.js"></script>\n</body>|' index.html
+          sed -i 's|httpsCallable([^)]*createMonteur[^)]*)|(async (data) => { return { data: await window.createMonteurDirect(data.email, data.password, data.name, data.projectId) }; })|g' index.html
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Auto-patch: create-monteur.js eingebunden" || echo "Keine Aenderungen"
+          git commit -m "Auto-hook: createMonteur auf direkte Client-Methode umgestellt" || echo "Keine Aenderungen"
           git push
