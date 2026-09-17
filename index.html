@@ -368,7 +368,7 @@ function renderMainComponents(){
 function render(){let x=p();$("projectSelect").innerHTML=state.projects.map(q=>`<option value="${q.id}" ${q.id===x.id?"selected":""}>${q.status==="archived"?"📦 ":""}${esc(q.name)}</option>`).join("");$("teamList").innerHTML=x.teams.map(t=>`<div style="padding:9px 0;border-bottom:1px solid #eee">${esc(t)}</div>`).join("");let sorted=[...x.rooms].sort((a,b)=>a.floor-b.floor||a.num.localeCompare(b.num));$("projectInfo").innerHTML=`<b>${esc(x.name)}</b><div class="small">Status: ${x.status==="archived"?"Archiviert":"Aktiv"}</div>${x.status==="archived"?`<button class="btn green" onclick="reactivate('${x.id}')">Projekt reaktivieren</button>`:""}`;let ar=state.projects.filter(q=>q.status==="archived");$("archiveList").innerHTML=ar.length?ar.map(q=>`<div class="room archive"><b>📦 ${esc(q.name)}</b><div class="small">${q.rooms.length} Räume · archiviert ${q.archivedAt?new Date(q.archivedAt).toLocaleDateString("de-DE"):""}</div><button class="btn light" onclick="state.activeId='${q.id}';persist();render()">Archiv ansehen</button><button class="btn green" onclick="reactivate('${q.id}')">Reaktivieren</button></div>`).join(""):"<span class='small'>Noch keine archivierten Projekte.</span>";renderDash();renderPlans();renderWorkflow("before");renderWorkflow("after");renderClarificationDashboard()}
 seedPlanRooms();render();
 </script><script src="create-monteur.js"></script>
-<div id="monteur-admin-box" style="margin: 20px auto; max-width: 420px; padding: 16px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e0e0e0; font-family: sans-serif;">
+<div id=\"monteur-create-box\" style=\"display:none;\"><div id="monteur-admin-box" style="margin: 20px auto; max-width: 420px; padding: 16px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e0e0e0; font-family: sans-serif;">
   <h3 style="margin-top:0; color:#2e7d32; font-size:18px;">Neuen Monteur anlegen</h3>
   <div style="display:flex; flex-direction:column; gap:10px;">
     <input id="newMonteurName" type="text" placeholder="Name des Monteurs" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
@@ -447,5 +447,17 @@ document.addEventListener('focusout', function(e) {
 
 // --- 2. UMSCHALTER FIV.ENERGY <-> MACBRIGHT ---
 </html>
+
+<script>
+function updateMonteurBoxVisibility() {
+  const box = document.getElementById("monteur-create-box");
+  if (!box) return;
+  const currentHash = window.location.hash || "";
+  const teamsActive = currentHash.includes("teams") || document.body.dataset.activeTab === "teams";
+  box.style.display = teamsActive ? "block" : "none";
+}
+window.addEventListener("hashchange", updateMonteurBoxVisibility);
+setInterval(updateMonteurBoxVisibility, 500);
+</script>
 </body>
 </html>
