@@ -1,23 +1,15 @@
-name: Hook createMonteur
+name: Find Monteur UI
 
 on:
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  hook:
+  find:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Aufruf auf window.createMonteurDirect umleiten
+      - name: Textsuche nach Monteur und Admin
         run: |
-          sed -i 's|httpsCallable([^)]*createMonteur[^)]*)|(async (data) => { return { data: await window.createMonteurDirect(data.email, data.password, data.name, data.projectId) }; })|g' index.html
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add index.html
-          git commit -m "Auto-hook: createMonteur auf direkte Client-Methode umgestellt" || echo "Keine Aenderungen"
-          git push
+          grep -in -C 3 -E "(monteur|createMonteur|admin)" index.html | head -n 40 || echo "Nichts gefunden"
