@@ -499,19 +499,32 @@ window.removeTeamMember = async function(name) {
 </script>
 
 
+
 <script id="clean-remove-member">
 window.removeTeamMember = async function(name) {
   if (!confirm("Möchtest du " + name + " wirklich entfernen?")) return;
   try {
     let proj = (typeof p === "function") ? p() : null;
     if (!proj || !proj.id) return;
-    let currentTeams = proj.teams || [];
-    let updated = currentTeams.filter(t => t !== name);
-    await fsProject().update({ teams: updated });
+
+    if (Array.isArray(proj.teams)) {
+      proj.teams = proj.teams.filter(t => t !== name);
+    }
+    if (typeof render === "function") render();
+
+    try {
+      await fsProject().update({
+        teams: firebase.firestore.FieldValue.arrayRemove(name)
+      });
+    } catch (fErr) {
+      await fsProject().update({ teams: proj.teams });
+    }
+
     if (typeof toast === "function") toast("Monteur entfernt");
   } catch (e) {
     console.error(e);
     alert("Fehler beim Entfernen: " + e.message);
+    if (typeof render === "function") render();
   }
 };
 </script>
@@ -543,6 +556,113 @@ const roomObserver = new MutationObserver(() => {
 window.addEventListener("DOMContentLoaded", () => {
   roomObserver.observe(document.body, { childList: true, subtree: true });
 });
+</script>
+
+<script id="multi-photo-support">
+window.wfPhotoBox = function(r, it, phase) {
+  let label = phase === "before" ? "VORHER · EINBAUORT" : "NACHHER · MONTAGE";
+  let photos = [];
+  let raw = it[phase];
+  if (Array.isArray(raw)) {
+    photos = raw;
+  } else if (typeof raw === "string" && raw.length > 0) {
+    photos = [raw];
+  }
+
+  let slotsHtml = "";
+  for (let i = 0; i < 3; i++) {
+    let src = photos[i] || "";
+    slotsHtml += `
+      <div style="flex:1; min-width:85px; max-width:110px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:6px; text-align:center;">
+        <div style="font-size:10px; font-weight:700; color:#64748b; margin-bottom:4px;">Foto ${i + 1}</div>
+        <div class="wfPhoto" style="height:70px; display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:6px; background:#fff;">
+          ${src ? `<img src="${src}" style="width:100%; height:100%; object-fit:cover;" onclick="window.open('${src}', '_blank')">` : `<span style="font-size:10px; color:#94a3b8;">Leer</span>`}
+        </div>
+        <div style="margin-top:6px; display:flex; gap:4px; justify-content:center;">
+          <label class="wfCamera" style="cursor:pointer; font-size:11px; padding:3px 6px; background:#e2e8f0; border-radius:4px;">
+            📷
+            <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="wfPhotoInputMulti('${r.id}', '${it.id}', '${phase}', ${i}, this)">
+          </label>
+          ${src ? `<button type="button" style="border:none; background:#fee2e2; color:#ef4444; font-size:11px; padding:3px 6px; border-radius:4px; cursor:pointer;" onclick="wfPhotoDeleteMulti('${r.id}', '${it.id}', '${phase}', ${i})">✕</button>` : ""}
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div style="margin-top:8px;">
+      <div class="small" style="font-weight:700; margin-bottom:4px; color:#334155;">${label} (bis zu 3)</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${slotsHtml}
+      </div>
+    </div>
+  `;
+};
+
+window.wfPhotoInputMulti = async function(rid, iid, phase, index, input) {
+  let file = input.files && input.files[0];
+  if (!file) return;
+
+  let data = (typeof compressFile === "function") ? await compressFile(file) : await new Promise(res => {
+    let reader = new FileReader();
+    reader.onload = e => res(e.target.result);
+    reader.readAsDataURL(file);
+  });
+
+  let val = data;
+  try {
+    if (typeof storage !== "undefined" && storage) {
+      let path = `projects/${p().id}/installations/${iid}/${phase}/${index}_${Date.now()}.jpg`;
+      let ref = storage.ref(path);
+      await ref.putString(data, "data_url");
+      val = await ref.getDownloadURL();
+    }
+  } catch(e) {
+    console.warn("Storage upload fallback", e);
+  }
+
+  try {
+    let docRef = fsInst().doc(iid);
+    let snap = await docRef.get();
+    let currentData = snap.data() || {};
+    let arr = currentData[phase] || [];
+    if (!Array.isArray(arr)) {
+      arr = (typeof arr === "string" && arr) ? [arr] : [];
+    }
+    arr = [...arr];
+    arr[index] = val;
+
+    await docRef.update({
+      [phase]: arr,
+      [phase + "At"]: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (err) {
+    console.error("Fehler beim Multi-Foto-Upload:", err);
+    alert("Fehler beim Foto-Speichern: " + err.message);
+  }
+};
+
+window.wfPhotoDeleteMulti = async function(rid, iid, phase, index) {
+  if (!confirm("Möchtest du dieses Foto wirklich löschen?")) return;
+  try {
+    let docRef = fsInst().doc(iid);
+    let snap = await docRef.get();
+    let currentData = snap.data() || {};
+    let arr = currentData[phase] || [];
+    if (!Array.isArray(arr)) {
+      arr = (typeof arr === "string" && arr) ? [arr] : [];
+    }
+    arr = [...arr];
+    arr[index] = "";
+
+    await docRef.update({
+      [phase]: arr
+    });
+  } catch (err) {
+    console.error(err);
+    alert("Fehler beim Löschen des Fotos: " + err.message);
+  }
+};
 </script>
 </body>
 </html>
