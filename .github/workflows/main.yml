@@ -13,44 +13,46 @@ jobs:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Code patchen
+      - name: Code patchen mit Node.js
         run: |
-          cat << 'EOF' > patch.py
-          with open("index.html", "r", encoding="utf-8") as f:
-              content = f.read()
+          node -e '
+          const fs = require("fs");
+          let content = fs.readFileSync("index.html", "utf8");
 
-          import re
+          // 1. fsProjects zu fsProject korrigieren
+          content = content.split("fsProjects().doc(proj.id)").join("fsProject()");
+          content = content.split("fsProjects()").join("fsProject()");
 
-          # 1. Korrektur: Loesch-Funktion nutzt das korrekte fsProject()
-          content = content.replace("fsProjects().doc(proj.id)", "fsProject()")
-          content = content.replace("fsProjects()", "fsProject()")
+          // 2. Entfernen-Funktion absolut absichern mit fsProject()
+          const fixedRemove = `
+          <script id="clean-remove-member">
+          window.removeTeamMember = async function(name) {
+            if (!confirm("Möchtest du " + name + " wirklich entfernen?")) return;
+            try {
+              let proj = (typeof p === "function") ? p() : null;
+              if (!proj || !proj.id) return;
+              let currentTeams = proj.teams || [];
+              let updated = currentTeams.filter(t => t !== name);
+              await fsProject().update({ teams: updated });
+              if (typeof toast === "function") toast("Monteur entfernt");
+            } catch (e) {
+              console.error(e);
+              alert("Fehler beim Entfernen: " + e.message);
+            }
+          };
+          </script>`;
+          if (!content.includes("clean-remove-member")) {
+            content = content.replace("</body>", fixedRemove + "\n</body>");
+          }
 
-          # 2. Raum-Status bei Re-Rendering (render()) beibehalten:
-          # Wir faedeln vor dem Neu-Rendern das Merken der offenen Details ein und stellen sie danach wieder her.
-          render_hook_old = "function render(){"
-          render_hook_new = """function render(){\n  let openDetails = new Set();\n  document.querySelectorAll("details[open]").forEach(d => {\n    if (d.id) openDetails.add(d.id);\n    let summary = d.querySelector("summary");\n    if (summary) openDetails.add(summary.textContent.trim());\n  });"""
-          
-          if render_hook_old in content and "let openDetails = new Set();" not in content:
-              content = content.replace(render_hook_old, render_hook_new, 1)
-
-          # Nach dem Rendern offenen Zustand wiederherstellen
-          restore_hook = """
-          setTimeout(() => {
-            document.querySelectorAll("details").forEach(d => {
-              let summary = d.querySelector("summary");
-              if ((d.id && openDetails.has(d.id)) || (summary && openDetails.has(summary.textContent.trim()))) {
-                d.open = true;
-              }
-            });
-          }, 0);
-          """
-          # Platzieren vor dem Ende von render() falls auffindbar, oder ueber MutationObserver
-          state_preserver = """
+          // 3. Raum-Offen Zustand merken und nach Render wiederherstellen
+          const statePreserver = `
           <script id="preserve-rooms-state">
           let globalOpenRooms = new Set();
           document.addEventListener("toggle", function(e) {
-            if (e.target.tagName === "DETAILS") {
-              let title = e.target.querySelector("summary")?.innerText?.trim();
+            if (e.target && e.target.tagName === "DETAILS") {
+              let s = e.target.querySelector("summary");
+              let title = s ? s.innerText.trim() : "";
               if (!title) return;
               if (e.target.open) {
                 globalOpenRooms.add(title);
@@ -62,7 +64,8 @@ jobs:
 
           const roomObserver = new MutationObserver(() => {
             document.querySelectorAll("details").forEach(d => {
-              let title = d.querySelector("summary")?.innerText?.trim();
+              let s = d.querySelector("summary");
+              let title = s ? s.innerText.trim() : "";
               if (title && globalOpenRooms.has(title) && !d.open) {
                 d.open = true;
               }
@@ -71,39 +74,38 @@ jobs:
           window.addEventListener("DOMContentLoaded", () => {
             roomObserver.observe(document.body, { childList: true, subtree: true });
           });
-          </script>
-          """
-          if "preserve-rooms-state" not in content and "</body>" in content:
-              content = content.replace("</body>", state_preserver + "\n</body>")
+          </script>`;
+          if (!content.includes("preserve-rooms-state")) {
+            content = content.replace("</body>", statePreserver + "\n</body>");
+          }
 
-          # 3. Monteur-Kasten zwingend physikalisch in den Teams-View verschieben
-          # Falls er am Ende vor </body> steht, schneiden wir ihn aus und haengen ihn an teamList
-          card_regex = r"(<div[^>]*id=\"monteur-register-card\"[^>]*>[\s\S]*?<\/button>\s*(?:<div[^>]*id=[\"']\w+Error[\"'][^>]*><\/div>)?\s*<\/div>\s*<\/div>|<div[^>]*class=[\"'][^\"']*card[^\"']*[\"'][^>]*>\s*<h\d[^>]*>\s*Neuen Monteur anlegen[\s\S]*?<\/button>\s*(?:<div[^>]*id=[\"']\w+Error[\"'][^>]*><\/div>)?\s*<\/div>)"
-          card_match = re.search(card_regex, content)
-          if card_match:
-              card_html = card_match.group(1)
-              content = content.replace(card_html, "")
-              
-              # Bereinigen und in einen sauberen Container packen
-              wrapped_card = f'<div id="monteur-custom-container" style="margin-top:20px;">{card_html}</div>'
-              
-              # An die teamList anhaengen
-              if 'id="teamList"' in content:
-                  content = content.replace('id="teamList"></div>', f'id="teamList"></div>\n{wrapped_card}')
-              elif 'id="teamList"' in content:
-                  content = re.sub(r'(<div[^>]*id=[\"']teamList[\"'][^>]*>[\s\S]*?<\/div>)', r'\1\n' + wrapped_card, content, count=1)
+          // 4. Monteur-Kasten physikalisch nur an den Teams-View haengen
+          const cardIdx = content.indexOf("Neuen Monteur anlegen");
+          if (cardIdx !== -1) {
+            const startCard = content.lastIndexOf("<div", cardIdx);
+            const endCard = content.indexOf("</button>", cardIdx);
+            if (startCard !== -1 && endCard !== -1) {
+              const closeDiv = content.indexOf("</div>", endCard);
+              if (closeDiv !== -1) {
+                const fullCard = content.slice(startCard, closeDiv + 6);
+                // Entfernen aus alter Position
+                content = content.replace(fullCard, "");
+                // In den Teams Container einfuegen
+                if (content.includes("id=\"teamList\"")) {
+                  content = content.replace("id=\"teamList\"></div>", "id=\"teamList\"></div>\n<div style=\"margin-top:20px;\">" + fullCard + "</div>");
+                }
+              }
+            }
+          }
 
-          with open("index.html", "w", encoding="utf-8") as f:
-              f.write(content)
-          EOF
-
-          python3 patch.py
-          rm patch.py
+          fs.writeFileSync("index.html", content, "utf8");
+          console.log("Erfolgreich gepatcht!");
+          '
 
       - name: Aenderungen speichern
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Fix delete action, isolate register box, preserve opened room state" || echo "Keine Aenderung"
+          git commit -m "Fix delete function, isolate monteur card to teams view, retain room state" || echo "Keine Aenderung"
           git push
