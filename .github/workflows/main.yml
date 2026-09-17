@@ -1,4 +1,4 @@
-name: Inspect Auth and Roles
+name: Inspect Workflow and Room Logic
 
 on:
   workflow_dispatch:
@@ -7,19 +7,19 @@ permissions:
   contents: write
 
 jobs:
-  inspect-roles:
+  inspect-code:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Rollen, Login und Raum-Zuweisung pruefen
+      - name: Workflow, Render und Raum-Logik auslesen
         run: |
-          echo "=== COMPANY MODE / FIRMENUMSCHALTUNG ==="
-          grep -n -C 5 "switchCompanyMode" index.html || grep -n -C 5 "companyMode" index.html || true
+          echo "=== RENDERWORKFLOW / MONTAGE-LISTE ==="
+          grep -n -C 8 "function renderWorkflow" index.html || true
 
-          echo "=== AUTH / ROLLE / USER PROFILE ==="
-          grep -n -C 5 "onAuthStateChanged" index.html || grep -n -C 5 "isAdmin" index.html || true
+          echo "=== RENDERDASH / DASHBOARD ==="
+          grep -n -C 8 "function renderDash" index.html || true
 
-          echo "=== RAEUME RENDERN / ZUWEISUNG TEAM ==="
-          grep -n -C 6 "assigned" index.html || grep -n -C 6 "renderRooms" index.html || grep -n -C 6 "r.team" index.html || true
+          echo "=== RENDERPLANS ==="
+          grep -n -C 8 "function renderPlans" index.html || true
