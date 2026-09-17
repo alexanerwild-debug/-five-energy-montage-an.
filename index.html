@@ -344,4 +344,68 @@ function renderMainComponents(){
 function render(){let x=p();$("projectSelect").innerHTML=state.projects.map(q=>`<option value="${q.id}" ${q.id===x.id?"selected":""}>${q.status==="archived"?"📦 ":""}${esc(q.name)}</option>`).join("");$("teamList").innerHTML=x.teams.map(t=>`<div style="padding:9px 0;border-bottom:1px solid #eee">${esc(t)}</div>`).join("");let sorted=[...x.rooms].sort((a,b)=>a.floor-b.floor||a.num.localeCompare(b.num));$("projectInfo").innerHTML=`<b>${esc(x.name)}</b><div class="small">Status: ${x.status==="archived"?"Archiviert":"Aktiv"}</div>${x.status==="archived"?`<button class="btn green" onclick="reactivate('${x.id}')">Projekt reaktivieren</button>`:""}`;let ar=state.projects.filter(q=>q.status==="archived");$("archiveList").innerHTML=ar.length?ar.map(q=>`<div class="room archive"><b>📦 ${esc(q.name)}</b><div class="small">${q.rooms.length} Räume · archiviert ${q.archivedAt?new Date(q.archivedAt).toLocaleDateString("de-DE"):""}</div><button class="btn light" onclick="state.activeId='${q.id}';persist();render()">Archiv ansehen</button><button class="btn green" onclick="reactivate('${q.id}')">Reaktivieren</button></div>`).join(""):"<span class='small'>Noch keine archivierten Projekte.</span>";renderDash();renderPlans();renderWorkflow("before");renderWorkflow("after");renderClarificationDashboard()}
 seedPlanRooms();render();
 </script><script src="create-monteur.js"></script>
-</body></html>
+<div id="monteur-admin-box" style="margin: 20px auto; max-width: 420px; padding: 16px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e0e0e0; font-family: sans-serif;">
+  <h3 style="margin-top:0; color:#2e7d32; font-size:18px;">Neuen Monteur anlegen</h3>
+  <div style="display:flex; flex-direction:column; gap:10px;">
+    <input id="newMonteurName" type="text" placeholder="Name des Monteurs" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
+    <input id="newMonteurEmail" type="email" placeholder="E-Mail-Adresse" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
+    <input id="newMonteurPass" type="password" placeholder="Passwort (mind. 6 Zeichen)" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
+    <button id="btnSaveMonteur" type="button" style="background:#2e7d32; color:#fff; border:none; padding:12px; border-radius:8px; font-weight:bold; font-size:16px; cursor:pointer;">Monteur anlegen & freischalten</button>
+    <div id="monteurFeedback" style="font-size:14px; font-weight:bold;"></div>
+  </div>
+</div>
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    const btn = document.getElementById("btnSaveMonteur");
+    if (btn) {
+      btn.onclick = async function() {
+        const name = document.getElementById("newMonteurName").value.trim();
+        const email = document.getElementById("newMonteurEmail").value.trim();
+        const pass = document.getElementById("newMonteurPass").value;
+        const feedback = document.getElementById("monteurFeedback");
+
+        if (!email || !pass) {
+          feedback.style.color = "red";
+          feedback.innerText = "Bitte E-Mail und Passwort ausfüllen!";
+          return;
+        }
+
+        feedback.style.color = "#0288d1";
+        feedback.innerText = "Konto wird eingerichtet...";
+
+        try {
+          if (typeof window.createMonteurDirect === "function") {
+            await window.createMonteurDirect(email, pass, name, "jugendamt-kassel");
+          } else if (typeof firebase !== "undefined" && firebase.auth) {
+            const secApp = firebase.initializeApp(firebase.app().options, "SecondaryApp");
+            const userCred = await secApp.auth().createUserWithEmailAndPassword(email, pass);
+            if (name) {
+              await userCred.user.updateProfile({ displayName: name });
+            }
+            await firebase.firestore().collection("users").doc(userCred.user.uid).set({
+              email: email,
+              name: name,
+              role: "monteur",
+              projectId: "jugendamt-kassel",
+              createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            await secApp.delete();
+          } else {
+            throw new Error("Firebase ist noch nicht initialisiert.");
+          }
+
+          feedback.style.color = "green";
+          feedback.innerText = "Erfolg: Monteur angelegt! Er kann sich jetzt einloggen.";
+          document.getElementById("newMonteurName").value = "";
+          document.getElementById("newMonteurEmail").value = "";
+          document.getElementById("newMonteurPass").value = "";
+        } catch(e) {
+          feedback.style.color = "red";
+          feedback.innerText = "Fehler: " + (e.message || e);
+        }
+      };
+    }
+  });
+</script>
+</body>
+</html>
