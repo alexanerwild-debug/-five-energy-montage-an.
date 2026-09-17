@@ -339,7 +339,7 @@ function renderMainComponents(){
  <div class="small">${a.length} Hauptkomponenten erfasst</div>`+
  a.map((it,n)=>`<div class="mcCard"><div class="wfHead"><div><b>${wfEsc(it.type)} #${a.filter(x=>x.type===it.type).indexOf(it)+1}</b><div class="small">angelegt von ${wfEsc(it.createdByEmail||"unbekannt")}</div></div>${it.createdBy===authUid()?`<button class="mcDelete" onclick="mcDelete('${it.id}')">Löschen</button>`:""}</div>
  <div class="wfPhotoPair">${mcPhotoBox(it,"before")}${mcPhotoBox(it,"after")}</div>
- <textarea class="wfNote" placeholder="Notiz / Einbauort" oninput="mcSet('${it.id}','note',this.value)">${wfEsc(it.note||"")}</textarea>
+ <textarea class="wfNote" placeholder="Notiz / Einbauort" onchange="mcSet('${it.id}','note',this.value)">${wfEsc(it.note||"")}</textarea>
  <div class="mcStatus">
  ${it.type==="CCU"||it.type==="Repeater"?`<label><input type="checkbox" ${it.signalChecked?"checked":""} onchange="mcSet('${it.id}','signalChecked',this.checked)"> Signalstärke geprüft</label><label><input type="checkbox" ${it.signalEnough?"checked":""} onchange="mcSet('${it.id}','signalEnough',this.checked)"> Signalstärke ausreichend</label>`:""}
  ${it.type==="Layer2"?`<label><input type="checkbox" ${it.telekomAppointment?"checked":""} onchange="mcSet('${it.id}','telekomAppointment',this.checked)"> Termin mit Telekom vereinbart</label>`:""}
