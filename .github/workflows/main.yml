@@ -1,51 +1,22 @@
-name: Cleanup Overlay And Inspect Inputs
+name: Find All Note Inputs
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  cleanup-and-find:
+  find-notes:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Stoerbalken komplett entfernen
+      - name: Textareas und Notizen lokalisieren
         run: |
-          # Entfernt den injizierten Switcher und alle Buttons/DIVs dazu restlos
-          python3 -c '
-          with open("index.html", "r", encoding="utf-8") as f:
-              lines = f.readlines()
-          clean_lines = []
-          skip = False
-          for line in lines:
-              if "company-switch-bar" in line or "btn-mode-five" in line or "macbright-content-view" in line:
-                  continue
-              if "function injectCompanySwitcher" in line:
-                  skip = True
-              if skip and "</script>" in line:
-                  skip = False
-                  continue
-              if not skip:
-                  clean_lines.append(line)
-          with open("index.html", "w", encoding="utf-8") as f:
-              f.writelines(clean_lines)
-          '
+          echo "=== ALLE VORKOMMEN VON TEXTAREA ==="
+          grep -n -C 2 -i "<textarea" index.html || true
 
-      - name: Notizfelder in Montage und Aufnahme finden
-        run: |
-          echo "=== SUCHE NACH TEXTAREA IN MONTAGE UND AUFNAHME ==="
-          grep -n -C 5 "<textarea" index.html || true
-          echo "=== SUCHE NACH WFSET ODER STATE UPDATES ==="
-          grep -n -C 5 "wfSet" index.html | head -n 30 || true
-
-      - name: Aenderungen speichern
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
-          git add index.html
-          git commit -m "Remove blocker banner and inspect textareas" || echo "Keine Aenderung"
-          git push
+          echo "=== SUCHE NACH NOTIZEN LOGIK ==="
+          grep -n -C 2 -i "notiz" index.html | head -n 40 || true
