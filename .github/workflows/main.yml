@@ -1,4 +1,4 @@
-name: Inspect Photo Upload and Fix UI Issues
+name: Fix Teams Form Isolation and Inspect Details
 
 on:
   workflow_dispatch:
@@ -7,84 +7,66 @@ permissions:
   contents: write
 
 jobs:
-  inspect-and-improve:
+  fix-and-inspect:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Menue-Styling vergroessern und Monteur-Formular isolieren
+      - name: Monteur-Formular isolieren und nur im Teams-Tab anzeigen
         run: |
           python3 -c '
           with open("index.html", "r", encoding="utf-8") as f:
               content = f.read()
 
-          # 1. Menue-Elemente vergroessern, Abstaende erhoehen und echte Icons setzen
-          icon_replacements = [
-              ("⌂ Übersicht", "🏠 Übersicht"),
-              ("Übersicht", "🏠 Übersicht"),
-              ("▣ Projekte & Archiv", "📁 Projekte & Archiv"),
-              ("Projekte & Archiv", "📁 Projekte & Archiv"),
-              ("■ Aufnahme Räume & Bestand", "📝 Aufnahme Räume"),
-              ("Aufnahme Räume & Bestand", "📝 Aufnahme Räume"),
-              ("▤ Pläne", "🗺️ Pläne"),
-              ("Pläne", "🗺️ Pläne"),
-              ("✓ Montage", "🔧 Montage"),
-              ("■ Hauptkomponenten", "⚡ Hauptkomponenten"),
-              ("Hauptkomponenten", "⚡ Hauptkomponenten"),
-              ("♙ Teams", "👥 Teams"),
-              ("Teams", "👥 Teams"),
-              ("◇ Komponenten", "📦 Komponenten"),
-              ("Komponenten", "📦 Komponenten"),
-              ("Arbeitsvorbereitung", "🧰 Arbeitsvorbereitung"),
-              ("Montageanleitungen", "📖 Montageanleitungen")
-          ]
+          # Monteur-Box in einen festen Container packen oder per CSS/ID kapseln
+          if "Neuen Monteur anlegen" in content:
+              # Falls die Box statisch im Body liegt, ID zuweisen und standardmaessig ausblenden
+              import re
+              content = re.sub(
+                  r"(<div[^>]*?>\s*<h\d[^>]*?>\s*Neuen Monteur anlegen|<h3>\s*Neuen Monteur anlegen|<div class=\"card\"[^>]*?>\s*<h\d>Neuen Monteur anlegen)",
+                  r"<div id=\"monteur-create-box\" style=\"display:none;\">\1",
+                  content,
+                  count=1
+              )
 
-          # Dopplungen vermeiden
-          for old_t, new_t in icon_replacements:
-              if new_t not in content and old_t in content:
-                  content = content.replace(old_t, new_t)
+          # JS-Hook: Monteur-Box nur anzeigen, wenn Teams aktiv ist
+          tab_hook = """
+          <script>
+          function updateMonteurBoxVisibility() {
+            const box = document.getElementById("monteur-create-box");
+            if (!box) return;
+            const currentHash = window.location.hash || "";
+            const teamsActive = currentHash.includes("teams") || document.body.dataset.activeTab === "teams";
+            box.style.display = teamsActive ? "block" : "none";
+          }
+          window.addEventListener("hashchange", updateMonteurBoxVisibility);
+          setInterval(updateMonteurBoxVisibility, 500);
+          </script>
+          </body>"""
 
-          # CSS fuer deutlich lesbareres Seitenmenue ergaenzen
-          menu_css = """
-          <style id="custom-menu-style">
-            .navItem {
-              font-size: 16px !important;
-              font-weight: 600 !important;
-              padding: 12px 16px !important;
-              display: flex !important;
-              align-items: center !important;
-              gap: 10px !important;
-              border-radius: 8px !important;
-              margin: 4px 8px !important;
-            }
-            .navSection, .navCategory, .navTitle {
-              font-size: 12px !important;
-              font-weight: 800 !important;
-              letter-spacing: 0.8px !important;
-              padding: 14px 16px 6px 16px !important;
-            }
-          </style>
-          </head>"""
-          if "</head>" in content and "custom-menu-style" not in content:
-              content = content.replace("</head>", menu_css)
+          if "</body>" in content and "updateMonteurBoxVisibility" not in content:
+              content = content.replace("</body>", tab_hook)
 
           with open("index.html", "w", encoding="utf-8") as f:
               f.write(content)
           '
 
-      - name: Foto-Upload und Monteur-Kasten inspizieren
+      - name: Code von Teams und Foto-Logik inspizieren
         run: |
-          echo "=== SUCHE NACH WFPHOTOINPUT ==="
-          grep -n -C 10 "function wfPhotoInput" index.html || true
+          echo "=== GENAUE LOCATION VON NEUEN MONTEUR ANLEGEN ==="
+          grep -n -C 8 "Neuen Monteur anlegen" index.html || true
 
-          echo "=== SUCHE NACH MONTEUR ANLEGEN FORMULAR ==="
-          grep -n -C 10 "Neuen Monteur anlegen" index.html || true
+          echo "=== TEAM-LISTE UND MONTEUR-VERWALTUNG ==="
+          grep -n -C 8 "wfTeam\|renderTeam" index.html || true
+
+          echo "=== FOTO-LOGIK (wfPhotoInput) ==="
+          grep -n -A 25 "function wfPhotoInput" index.html || true
 
       - name: Aenderungen speichern
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Improve sidebar typography and icons" || echo "Keine Aenderung"
+          git commit -m "Isolate monteur box and inspect photo and team logic" || echo "Keine Aenderung"
           git push
