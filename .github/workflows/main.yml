@@ -1,4 +1,4 @@
-name: Rollback To Working State
+name: Add Monteur Form Clean
 
 on:
   workflow_dispatch:
@@ -7,19 +7,85 @@ permissions:
   contents: write
 
 jobs:
-  rollback:
+  add-ui:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: index.html auf funktionierenden Stand zuruecksetzen
+      - name: Formular sicher vor schließendem body einsetzen
         run: |
-          git checkout 844beae -- index.html
+          cat << 'EOF' > injection.html
+          <div id="monteur-admin-box" style="margin: 20px auto; max-width: 420px; padding: 16px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); border: 1px solid #e0e0e0; font-family: sans-serif;">
+            <h3 style="margin-top:0; color:#2e7d32; font-size:18px;">Neuen Monteur anlegen</h3>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+              <input id="newMonteurName" type="text" placeholder="Name des Monteurs" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
+              <input id="newMonteurEmail" type="email" placeholder="E-Mail-Adresse" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
+              <input id="newMonteurPass" type="password" placeholder="Passwort (mind. 6 Zeichen)" style="padding:10px; border-radius:8px; border:1px solid #ccc; font-size:16px;">
+              <button id="btnSaveMonteur" type="button" style="background:#2e7d32; color:#fff; border:none; padding:12px; border-radius:8px; font-weight:bold; font-size:16px; cursor:pointer;">Monteur anlegen & freischalten</button>
+              <div id="monteurFeedback" style="font-size:14px; font-weight:bold;"></div>
+            </div>
+          </div>
+          <script>
+            document.addEventListener("DOMContentLoaded", function() {
+              const btn = document.getElementById("btnSaveMonteur");
+              if (btn) {
+                btn.onclick = async function() {
+                  const name = document.getElementById("newMonteurName").value.trim();
+                  const email = document.getElementById("newMonteurEmail").value.trim();
+                  const pass = document.getElementById("newMonteurPass").value;
+                  const feedback = document.getElementById("monteurFeedback");
+
+                  if (!email || !pass) {
+                    feedback.style.color = "red";
+                    feedback.innerText = "Bitte E-Mail und Passwort ausfüllen!";
+                    return;
+                  }
+
+                  feedback.style.color = "#0288d1";
+                  feedback.innerText = "Konto wird eingerichtet...";
+
+                  try {
+                    if (typeof window.createMonteurDirect === "function") {
+                      await window.createMonteurDirect(email, pass, name, "jugendamt-kassel");
+                    } else if (typeof firebase !== "undefined" && firebase.auth) {
+                      const secApp = firebase.initializeApp(firebase.app().options, "SecondaryApp");
+                      const userCred = await secApp.auth().createUserWithEmailAndPassword(email, pass);
+                      if (name) {
+                        await userCred.user.updateProfile({ displayName: name });
+                      }
+                      await firebase.firestore().collection("users").doc(userCred.user.uid).set({
+                        email: email,
+                        name: name,
+                        role: "monteur",
+                        projectId: "jugendamt-kassel",
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                      }, { merge: true });
+                      await secApp.delete();
+                    } else {
+                      throw new Error("Firebase ist noch nicht initialisiert.");
+                    }
+
+                    feedback.style.color = "green";
+                    feedback.innerText = "Erfolg: Monteur angelegt! Er kann sich jetzt einloggen.";
+                    document.getElementById("newMonteurName").value = "";
+                    document.getElementById("newMonteurEmail").value = "";
+                    document.getElementById("newMonteurPass").value = "";
+                  } catch(e) {
+                    feedback.style.color = "red";
+                    feedback.innerText = "Fehler: " + (e.message || e);
+                  }
+                };
+              }
+            });
+          </script>
+          EOF
+          sed -i -e '/<\/body>/{r injection.html' -e 'd}' index.html
+          echo "</body>" >> index.html
+          echo "</html>" >> index.html
+          rm injection.html
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Rollback: index.html auf funktionierenden Stand zurueckgesetzt" || echo "Keine Aenderung noetig"
+          git commit -m "Add clean monteur registration form" || echo "Keine Aenderung"
           git push
