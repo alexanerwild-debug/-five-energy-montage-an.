@@ -1,22 +1,39 @@
-name: Find All Note Inputs
+name: Fix Montage And Aufnahme Input Focus
 
 on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  find-notes:
+  fix-focus:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Textareas und Notizen lokalisieren
+      - name: Textarea Events auf onchange und onblur korrigieren
         run: |
-          echo "=== ALLE VORKOMMEN VON TEXTAREA ==="
-          grep -n -C 2 -i "<textarea" index.html || true
+          python3 -c '
+          with open("index.html", "r", encoding="utf-8") as f:
+              content = f.read()
 
-          echo "=== SUCHE NACH NOTIZEN LOGIK ==="
-          grep -n -C 2 -i "notiz" index.html | head -n 40 || true
+          # Ersetzt alle aggressiven oninput-Events auf textareas und inputs durch onchange
+          content = content.replace("oninput=\"wfSet(", "onchange=\"wfSet(")
+          content = content.replace("oninput=\"wfNote(", "onchange=\"wfNote(")
+
+          # Verhindert, dass Focus verloren geht, falls renderWorkflow aufgerufen wird
+          # Tausche alle direkten oninput bei Notiz-Feldern aus
+          import re
+          content = re.sub(r"<textarea([^>]*?)oninput=", r"<textarea\1onchange=", content)
+
+          with open("index.html", "w", encoding="utf-8") as f:
+              f.write(content)
+          '
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add index.html
+          git commit -m "Fix textarea keyboard focus in Montage and Aufnahme" || echo "Keine Aenderung"
+          git push
