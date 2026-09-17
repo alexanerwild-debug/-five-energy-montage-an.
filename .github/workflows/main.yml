@@ -1,4 +1,4 @@
-name: Apply Teams Fix and State Retention
+name: Finalize Team Delete and 3 Photos Per Component
 
 on:
   workflow_dispatch:
@@ -7,23 +7,19 @@ permissions:
   contents: write
 
 jobs:
-  apply-fixes:
+  finalize-features:
     runs-on: ubuntu-latest
     steps:
       - name: Repository laden
         uses: actions/checkout@v4
 
-      - name: Code patchen mit Node.js
+      - name: Team-Loeschen und 3 Fotos patchen
         run: |
           node -e '
           const fs = require("fs");
           let content = fs.readFileSync("index.html", "utf8");
 
-          // 1. fsProjects zu fsProject korrigieren
-          content = content.split("fsProjects().doc(proj.id)").join("fsProject()");
-          content = content.split("fsProjects()").join("fsProject()");
-
-          // 2. Entfernen-Funktion absolut absichern mit fsProject()
+          // 1. removeTeamMember mit sofortigem State-Update, arrayRemove und re-render
           const fixedRemove = `
           <script id="clean-remove-member">
           window.removeTeamMember = async function(name) {
@@ -31,75 +27,157 @@ jobs:
             try {
               let proj = (typeof p === "function") ? p() : null;
               if (!proj || !proj.id) return;
-              let currentTeams = proj.teams || [];
-              let updated = currentTeams.filter(t => t !== name);
-              await fsProject().update({ teams: updated });
+
+              // Lokalen State sofort anpassen fuer verzögerungsfreies UI-Feedback
+              if (Array.isArray(proj.teams)) {
+                proj.teams = proj.teams.filter(t => t !== name);
+              }
+              if (typeof render === "function") render();
+
+              // Firestore synchronisieren
+              try {
+                await fsProject().update({
+                  teams: firebase.firestore.FieldValue.arrayRemove(name)
+                });
+              } catch (fErr) {
+                // Fallback falls arrayRemove nicht greift
+                await fsProject().update({ teams: proj.teams });
+              }
+
               if (typeof toast === "function") toast("Monteur entfernt");
             } catch (e) {
               console.error(e);
               alert("Fehler beim Entfernen: " + e.message);
+              if (typeof render === "function") render();
             }
           };
           </script>`;
-          if (!content.includes("clean-remove-member")) {
+
+          if (content.includes("id=\"clean-remove-member\"")) {
+            content = content.replace(/<script id="clean-remove-member">[\s\S]*?<\/script>/, fixedRemove);
+          } else {
             content = content.replace("</body>", fixedRemove + "\n</body>");
           }
 
-          // 3. Raum-Offen Zustand merken und nach Render wiederherstellen
-          const statePreserver = `
-          <script id="preserve-rooms-state">
-          let globalOpenRooms = new Set();
-          document.addEventListener("toggle", function(e) {
-            if (e.target && e.target.tagName === "DETAILS") {
-              let s = e.target.querySelector("summary");
-              let title = s ? s.innerText.trim() : "";
-              if (!title) return;
-              if (e.target.open) {
-                globalOpenRooms.add(title);
-              } else {
-                globalOpenRooms.delete(title);
-              }
+          // 2. Foto-Logik fuer bis zu 3 Bilder erweitern
+          // Wir passen wfPhotoBox und wfPhotoInput an
+          const photoUpgrade = `
+          <script id="multi-photo-support">
+          window.wfPhotoBox = function(r, it, phase) {
+            let label = phase === "before" ? "VORHER · EINBAUORT" : "NACHHER · MONTAGE";
+            let photos = [];
+            let raw = it[phase];
+            if (Array.isArray(raw)) {
+              photos = raw;
+            } else if (typeof raw === "string" && raw.length > 0) {
+              photos = [raw];
             }
-          }, true);
 
-          const roomObserver = new MutationObserver(() => {
-            document.querySelectorAll("details").forEach(d => {
-              let s = d.querySelector("summary");
-              let title = s ? s.innerText.trim() : "";
-              if (title && globalOpenRooms.has(title) && !d.open) {
-                d.open = true;
-              }
+            let slotsHtml = "";
+            for (let i = 0; i < 3; i++) {
+              let src = photos[i] || "";
+              slotsHtml += \`
+                <div style="flex:1; min-width:85px; max-width:110px; background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px; padding:6px; text-align:center; position:relative;">
+                  <div style="font-size:10px; font-weight:700; color:#64748b; margin-bottom:4px;">Foto \${i + 1}</div>
+                  <div class="wfPhoto" style="height:70px; display:flex; align-items:center; justify-content:center; overflow:hidden; border-radius:6px; background:#fff;">
+                    \${src ? \`<img src="\${src}" style="width:100%; height:100%; object-fit:cover;" onclick="window.open('\${src}', '_blank')">\` : \`<span style="font-size:10px; color:#94a3b8;">Leer</span>\`}
+                  </div>
+                  <div style="margin-top:6px; display:flex; gap:4px; justify-content:center;">
+                    <label class="wfCamera" style="cursor:pointer; font-size:11px; padding:3px 6px; background:#e2e8f0; border-radius:4px;">
+                      📷
+                      <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="wfPhotoInputMulti('\${r.id}', '\${it.id}', '\${phase}', \${i}, this)">
+                    </label>
+                    \${src ? \`<button type="button" style="border:none; background:#fee2e2; color:#ef4444; font-size:11px; padding:3px 6px; border-radius:4px; cursor:pointer;" onclick="wfPhotoDeleteMulti('\${r.id}', '\${it.id}', '\${phase}', \${i})">✕</button>\` : ""}
+                  </div>
+                </div>
+              \`;
+            }
+
+            return \`
+              <div style="margin-top:8px;">
+                <div class="small" style="font-weight:700; margin-bottom:4px; color:#334155;">\${label} (bis zu 3)</div>
+                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                  \${slotsHtml}
+                </div>
+              </div>
+            \`;
+          };
+
+          window.wfPhotoInputMulti = async function(rid, iid, phase, index, input) {
+            let file = input.files && input.files[0];
+            if (!file) return;
+
+            let data = (typeof compressFile === "function") ? await compressFile(file) : await new Promise(res => {
+              let reader = new FileReader();
+              reader.onload = e => res(e.target.result);
+              reader.readAsDataURL(file);
             });
-          });
-          window.addEventListener("DOMContentLoaded", () => {
-            roomObserver.observe(document.body, { childList: true, subtree: true });
-          });
-          </script>`;
-          if (!content.includes("preserve-rooms-state")) {
-            content = content.replace("</body>", statePreserver + "\n</body>");
-          }
 
-          // 4. Monteur-Kasten physikalisch nur an den Teams-View haengen
-          const cardIdx = content.indexOf("Neuen Monteur anlegen");
-          if (cardIdx !== -1) {
-            const startCard = content.lastIndexOf("<div", cardIdx);
-            const endCard = content.indexOf("</button>", cardIdx);
-            if (startCard !== -1 && endCard !== -1) {
-              const closeDiv = content.indexOf("</div>", endCard);
-              if (closeDiv !== -1) {
-                const fullCard = content.slice(startCard, closeDiv + 6);
-                // Entfernen aus alter Position
-                content = content.replace(fullCard, "");
-                // In den Teams Container einfuegen
-                if (content.includes("id=\"teamList\"")) {
-                  content = content.replace("id=\"teamList\"></div>", "id=\"teamList\"></div>\n<div style=\"margin-top:20px;\">" + fullCard + "</div>");
-                }
+            let val = data;
+            try {
+              if (typeof storage !== "undefined" && storage) {
+                let path = \`projects/\${p().id}/installations/\${iid}/\${phase}/\${index}_\${Date.now()}.jpg\`;
+                let ref = storage.ref(path);
+                await ref.putString(data, "data_url");
+                val = await ref.getDownloadURL();
               }
+            } catch(e) {
+              console.warn("Storage upload fallback", e);
             }
+
+            // Installations-Dokument holen und Array aktualisieren
+            try {
+              let docRef = fsInst().doc(iid);
+              let snap = await docRef.get();
+              let currentData = snap.data() || {};
+              let arr = currentData[phase] || [];
+              if (!Array.isArray(arr)) {
+                arr = (typeof arr === "string" && arr) ? [arr] : [];
+              }
+              arr = [...arr];
+              arr[index] = val;
+
+              await docRef.update({
+                [phase]: arr,
+                [phase + "At"]: firebase.firestore.FieldValue.serverTimestamp()
+              });
+            } catch (err) {
+              console.error("Fehler beim Multi-Foto-Upload:", err);
+              alert("Fehler beim Foto-Speichern: " + err.message);
+            }
+          };
+
+          window.wfPhotoDeleteMulti = async function(rid, iid, phase, index) {
+            if (!confirm("Möchtest du dieses Foto wirklich löschen?")) return;
+            try {
+              let docRef = fsInst().doc(iid);
+              let snap = await docRef.get();
+              let currentData = snap.data() || {};
+              let arr = currentData[phase] || [];
+              if (!Array.isArray(arr)) {
+                arr = (typeof arr === "string" && arr) ? [arr] : [];
+              }
+              arr = [...arr];
+              arr[index] = "";
+
+              await docRef.update({
+                [phase]: arr
+              });
+            } catch (err) {
+              console.error(err);
+              alert("Fehler beim Löschen des Fotos: " + err.message);
+            }
+          };
+          </script>`;
+
+          if (!content.includes("multi-photo-support")) {
+            content = content.replace("</body>", photoUpgrade + "\n</body>");
+          } else {
+            content = content.replace(/<script id="multi-photo-support">[\s\S]*?<\/script>/, photoUpgrade);
           }
 
           fs.writeFileSync("index.html", content, "utf8");
-          console.log("Erfolgreich gepatcht!");
+          console.log("Team-Loeschen & 3-Fotos-Logik erfolgreich integriert!");
           '
 
       - name: Aenderungen speichern
@@ -107,5 +185,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Fix delete function, isolate monteur card to teams view, retain room state" || echo "Keine Aenderung"
+          git commit -m "Support up to 3 photos per component and finalize team deletion" || echo "Keine Aenderung"
           git push
