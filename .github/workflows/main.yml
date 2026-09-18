@@ -1,4 +1,4 @@
-name: Robust Firestore Persistence and Visible Room Card Badges
+name: Fix Mobile Layout, Menu Persistence and Dashboard Sync
 
 on:
   workflow_dispatch:
@@ -7,14 +7,14 @@ permissions:
   contents: write
 
 jobs:
-  fix-persistence-and-ui:
+  fix-app:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Inject Direct Firestore Sync and Room Card Injector
+      - name: Patch index.html with clean layout, native sync and resilient menu
         run: |
           python3 - << 'EOF'
           with open("index.html", "r", encoding="utf-8") as f:
@@ -48,18 +48,16 @@ jobs:
             return proj.rooms || (proj.project && proj.project.rooms) || [];
           }
 
-          // Dauerhafte Speicherung über alle nativen Methoden & Firestore Doc-Referenzen
+          // Speichert zuverlässig in Firestore und ruft native App-Rerender auf
           async function persistRoomsOnly() {
             let proj = getAppProject();
             let rooms = getAppRooms();
 
-            // 1. Native Save-Funktionen der App triggern
             try {
               if (typeof saveProject === "function") await saveProject();
               else if (typeof save === "function") await save();
             } catch(e) {}
 
-            // 2. Direkt auf Firestore schreiben
             try {
               if (typeof fsProject === "function") {
                 let ref = fsProject();
@@ -71,7 +69,6 @@ jobs:
               }
             } catch(e) {}
 
-            // 3. Fallback über aktive Projekt-ID in Firestore
             try {
               let pid = (typeof curProjectId !== "undefined" && curProjectId) || 
                         (proj && (proj.id || (proj.project && proj.project.id)));
@@ -80,12 +77,11 @@ jobs:
               }
             } catch(e) {}
 
-            // 4. LocalStorage Backup für sofortigen Offline-/Page-Reload-Schutz
+            // Native Render der App antriggern, damit das Übersicht-Dashboard direkt aktualisiert wird
             try {
-              if (proj) {
-                let pid = proj.id || "current_project";
-                localStorage.setItem("fiv_backup_" + pid, JSON.stringify(rooms));
-              }
+              if (typeof renderDashboard === "function") renderDashboard();
+              if (typeof render === "function") render();
+              if (typeof updateStats === "function") updateStats();
             } catch(e) {}
           }
 
@@ -132,12 +128,15 @@ jobs:
               room.workSessions.push({ start: Date.now(), end: null });
             }
 
+            // Alle nativen Status-Felder synchron setzen
             room.status = "in_progress";
+            room.montageDone = false;
+            room.done = false;
             if (!room.startedAt) room.startedAt = Date.now();
             room.completedAt = null;
 
             await persistRoomsOnly();
-            updateAllRoomVisuals();
+            injectRoomControls();
             if (typeof renderWorkflow === "function") renderWorkflow();
           };
 
@@ -159,11 +158,15 @@ jobs:
               if (!last.end) last.end = now;
             }
 
-            room.status = "completed";
+            // Native Felder für die Übersicht setzen: 'done' + 'completed' + 'montageDone'
+            room.status = "done";
+            room.completed = true;
+            room.montageDone = true;
+            room.done = true;
             room.completedAt = now;
 
             await persistRoomsOnly();
-            updateAllRoomVisuals();
+            injectRoomControls();
             if (typeof renderWorkflow === "function") renderWorkflow();
           };
 
@@ -181,9 +184,11 @@ jobs:
 
             room.workSessions.push({ start: Date.now(), end: null });
             room.status = "in_progress";
+            room.montageDone = false;
+            room.done = false;
 
             await persistRoomsOnly();
-            updateAllRoomVisuals();
+            injectRoomControls();
             if (typeof renderWorkflow === "function") renderWorkflow();
           };
 
@@ -198,89 +203,156 @@ jobs:
               if (!last.end) last.end = now;
             }
 
+            room.status = "done";
+            room.montageDone = true;
+            room.done = true;
+            room.completedAt = now;
+
             await persistRoomsOnly();
-            updateAllRoomVisuals();
+            injectRoomControls();
             if (typeof renderWorkflow === "function") renderWorkflow();
           };
 
-          // HTML Snippet für Status + getrennte Buttons
+          // Saubere, responsive Leiste (kein Überlauf, wrap-fähig)
           window.getRoomStatusSnippet = function(r) {
             let active = isRoomActive(r);
-            let isDone = (r.status === "completed" || (r.completedAt && !active));
+            let isDone = (r.status === "done" || r.status === "completed" || r.montageDone || (r.completedAt && !active));
             let totalMs = getRoomTotalDurationMs(r);
             let timeStr = formatSecs(totalMs);
             let sessCount = (r.workSessions || []).length;
 
-            let badge = '<span class="status-badge" style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;">Offen</span>';
+            let badge = '<span style="padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;white-space:nowrap;">Offen</span>';
             if (isDone) {
-              badge = '<span class="status-badge" style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;">✔ Abgeschlossen (' + timeStr + ')</span>';
+              badge = '<span style="padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;white-space:nowrap;">✔ Abgeschlossen (' + timeStr + ')</span>';
             } else if (active) {
-              badge = '<span class="status-badge" id="timer-badge-' + r.id + '" style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;">⏱ In Arbeit (' + timeStr + ')</span>';
+              badge = '<span id="timer-badge-' + r.id + '" style="padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;white-space:nowrap;">⏱ In Arbeit (' + timeStr + ')</span>';
             }
 
             let btn1 = "";
             if (!active && !isDone) {
-              btn1 = '<button type="button" class="btn green" style="width:auto;padding:6px 12px;margin:0;font-size:12px;" onclick="event.stopPropagation();startRoomWork(\\'' + r.id + '\\')">▶ Start</button>';
+              btn1 = '<button type="button" class="btn green" style="width:auto;padding:5px 10px;margin:2px;font-size:11px;white-space:nowrap;" onclick="event.stopPropagation();startRoomWork(\\'' + r.id + '\\')">▶ Start</button>';
             } else if (active && !r.completedAt) {
-              btn1 = '<button type="button" class="btn green" style="width:auto;padding:6px 12px;margin:0;font-size:12px;background:#10b981;" onclick="event.stopPropagation();finishRoomWork(\\'' + r.id + '\\')">✔ Fertig</button>';
+              btn1 = '<button type="button" class="btn green" style="width:auto;padding:5px 10px;margin:2px;font-size:11px;background:#10b981;white-space:nowrap;" onclick="event.stopPropagation();finishRoomWork(\\'' + r.id + '\\')">✔ Fertig</button>';
             } else {
-              btn1 = '<button type="button" class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:12px;background:#e2e8f0;color:#64748b;cursor:default;" disabled>✔ Abgeschlossen</button>';
+              btn1 = '<button type="button" class="btn" style="width:auto;padding:5px 10px;margin:2px;font-size:11px;background:#e2e8f0;color:#64748b;white-space:nowrap;cursor:default;" disabled>✔ Fertig</button>';
             }
 
             let btn2 = "";
             if (isDone) {
-              btn2 = '<button type="button" class="btn" style="width:auto;padding:6px 12px;margin-left:6px;font-size:12px;background:#3b82f6;color:#fff;" onclick="event.stopPropagation();addExtraSession(\\'' + r.id + '\\')">➕ Nacharbeit / Session ' + (sessCount + 1) + '</button>';
+              btn2 = '<button type="button" class="btn" style="width:auto;padding:5px 10px;margin:2px;font-size:11px;background:#3b82f6;color:#fff;white-space:nowrap;" onclick="event.stopPropagation();addExtraSession(\\'' + r.id + '\\')">➕ Nacharbeit</button>';
             } else if (active && r.completedAt) {
-              btn2 = '<button type="button" class="btn" style="width:auto;padding:6px 12px;margin-left:6px;font-size:12px;background:#f59e0b;color:#fff;" onclick="event.stopPropagation();stopExtraSession(\\'' + r.id + '\\')">⏹ Session beenden</button>';
+              btn2 = '<button type="button" class="btn" style="width:auto;padding:5px 10px;margin:2px;font-size:11px;background:#f59e0b;color:#fff;white-space:nowrap;" onclick="event.stopPropagation();stopExtraSession(\\'' + r.id + '\\')">⏹ Pause</button>';
             }
 
-            return '<div class="room-session-controls" data-room-id="' + r.id + '" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + '<div style="display:flex;align-items:center;">' + btn1 + btn2 + '</div></div>';
+            return '<div class="room-session-box" data-injected-id="' + r.id + '" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;padding:6px 0;margin:4px 0;width:100%;box-sizing:border-box;">' +
+                   badge +
+                   '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' + btn1 + btn2 + '</div>' +
+                   '</div>';
           };
 
-          // Hebt den Status direkt in den Raumkarten (Übersicht & Montage) hervor
-          function updateAllRoomVisuals() {
+          // Verhindert doppelte Buttons und platziert die Leiste exakt EINMAL pro Raumkarte
+          function injectRoomControls() {
             let rooms = getAppRooms();
             rooms.forEach(r => {
               let active = isRoomActive(r);
-              let isDone = (r.status === "completed" || (r.completedAt && !active));
+              let isDone = (r.status === "done" || r.status === "completed" || r.montageDone || (r.completedAt && !active));
               let timeStr = formatSecs(getRoomTotalDurationMs(r));
 
-              // Alle DOM-Elemente finden, die diesem Raum zugeordnet sind
-              let roomEls = document.querySelectorAll(`[data-id="${r.id}"], [data-room-id="${r.id}"], .room-card, .room-item`);
-              roomEls.forEach(el => {
-                let cardText = el.textContent || "";
-                if (el.getAttribute("data-id") === String(r.id) || el.getAttribute("data-room-id") === String(r.id) || (r.name && cardText.includes(r.name))) {
-                  let existingBadge = el.querySelector(".card-status-indicator");
-                  let statusHtml = isDone 
-                    ? `<span class="card-status-indicator" style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;margin-left:6px;">✔ Fertig (${timeStr})</span>`
-                    : (active ? `<span class="card-status-indicator" style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;margin-left:6px;">⏱ In Bearbeitung (${timeStr})</span>` : '');
-
-                  if (existingBadge) {
-                    existingBadge.outerHTML = statusHtml;
-                  } else if (statusHtml) {
-                    let titleEl = el.querySelector("h3, h4, .title, b, strong") || el;
-                    titleEl.insertAdjacentHTML("beforeend", statusHtml);
+              // Alle Raum-Köpfe finden
+              let elements = document.querySelectorAll(`[data-id="${r.id}"], [data-room-id="${r.id}"]`);
+              if (!elements.length) {
+                // Fallback über Text-Inhalt
+                document.querySelectorAll(".room-header, .room-card, details").forEach(el => {
+                  if (r.name && el.textContent.includes(r.name)) {
+                    // Bereits vorhanden?
+                    let existing = el.querySelector(`.room-session-box[data-injected-id="${r.id}"]`);
+                    if (existing) {
+                      existing.outerHTML = getRoomStatusSnippet(r);
+                    } else {
+                      let anchor = el.querySelector("summary, .header, h3, h4") || el;
+                      anchor.insertAdjacentHTML("afterend", getRoomStatusSnippet(r));
+                    }
                   }
-                }
-              });
+                });
+              } else {
+                elements.forEach(el => {
+                  let existing = el.querySelector(`.room-session-box[data-injected-id="${r.id}"]`);
+                  if (existing) {
+                    existing.outerHTML = getRoomStatusSnippet(r);
+                  } else {
+                    el.insertAdjacentHTML("afterbegin", getRoomStatusSnippet(r));
+                  }
+                });
+              }
 
-              // Timer-Badge im Detailbereich aktualisieren falls sichtbar
-              let badge = document.getElementById("timer-badge-" + r.id);
-              if (badge && active) {
-                badge.textContent = "⏱ In Arbeit (" + timeStr + ")";
+              let timerBadge = document.getElementById("timer-badge-" + r.id);
+              if (timerBadge && active) {
+                timerBadge.textContent = "⏱ In Arbeit (" + timeStr + ")";
               }
             });
           }
 
-          setInterval(updateAllRoomVisuals, 1000);
+          // Dauerhafter Menü-Wächter: Stellt sicher, dass das PM-Menü NIE verschwindet
+          function ensurePmNavExists() {
+            let aside = document.querySelector("aside.side");
+            if (!aside) return;
 
-          function hidePmViews() {
-            let c1 = document.getElementById("pmCockpitContainer");
-            let c2 = document.getElementById("programmierenContainer");
-            if (c1) c1.style.display = "none";
-            if (c2) c2.style.display = "none";
+            let pmGroup = document.getElementById("pmNavGroup");
+            if (!pmGroup) {
+              let div = document.createElement("div");
+              div.id = "pmNavGroup";
+              div.style.cssText = "margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #cbd5e1;";
+              div.innerHTML = `
+                <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 8px;text-transform:uppercase;">Projektleiter</div>
+                <button type="button" id="btnPmCockpit" style="width:100%;text-align:left;display:flex;align-items:center;gap:6px;padding:8px 10px;margin:2px 0;font-size:13px;font-weight:600;border:none;background:transparent;cursor:pointer;">📊 Cockpit</button>
+                <button type="button" id="btnPmProg" style="width:100%;text-align:left;display:flex;align-items:center;gap:6px;padding:8px 10px;margin:2px 0;font-size:13px;font-weight:600;border:none;background:transparent;cursor:pointer;">💻 Programmieren</button>
+              `;
+              aside.insertBefore(div, aside.firstChild);
+              bindPmButtons();
+            }
+
+            let admin = isBoss();
+            let el = document.getElementById("pmNavGroup");
+            if (el) el.style.display = admin ? "block" : "none";
           }
 
+          function bindPmButtons() {
+            let btnCockpit = document.getElementById("btnPmCockpit");
+            if (btnCockpit) {
+              btnCockpit.onclick = function() {
+                document.querySelectorAll("main > div, main > section").forEach(d => {
+                  if (d.id !== "pmCockpitContainer") d.style.display = "none";
+                });
+                let c = document.getElementById("pmCockpitContainer");
+                if (c) { c.style.display = "block"; renderPmCockpit(); }
+              };
+            }
+
+            let btnProg = document.getElementById("btnPmProg");
+            if (btnProg) {
+              btnProg.onclick = function() {
+                document.querySelectorAll("main > div, main > section").forEach(d => {
+                  if (d.id !== "programmierenContainer") d.style.display = "none";
+                });
+                let c = document.getElementById("programmierenContainer");
+                if (c) { c.style.display = "block"; renderProgrammieren(); }
+              };
+            }
+
+            document.querySelectorAll("aside.side button:not(#btnPmCockpit):not(#btnPmProg)").forEach(btn => {
+              btn.onclick = (function(orig) {
+                return function(e) {
+                  let c1 = document.getElementById("pmCockpitContainer");
+                  let c2 = document.getElementById("programmierenContainer");
+                  if (c1) c1.style.display = "none";
+                  if (c2) c2.style.display = "none";
+                  if (typeof orig === "function") orig.call(this, e);
+                };
+              })(btn.onclick);
+            });
+          }
+
+          // PM-Cockpit Rendering
           window.renderPmCockpit = function() {
             let container = document.getElementById("pmCockpitContainer");
             if (!container) return;
@@ -297,8 +369,11 @@ jobs:
               totalComps += comps;
               totalMs += getRoomTotalDurationMs(r);
 
-              if (isRoomActive(r)) inP++;
-              else if (r.status === "completed" || r.completedAt) {
+              let active = isRoomActive(r);
+              let isDone = (r.status === "done" || r.status === "completed" || r.montageDone || (r.completedAt && !active));
+
+              if (active) inP++;
+              else if (isDone) {
                 done++;
                 installedComps += comps;
               }
@@ -309,7 +384,7 @@ jobs:
 
             let rows = rooms.map(r => {
               let rActive = isRoomActive(r);
-              let rDone = (r.status === "completed" || (r.completedAt && !rActive));
+              let rDone = (r.status === "done" || r.status === "completed" || r.montageDone || (r.completedAt && !rActive));
               let statusLabel = rDone ? '<span style="color:#16a34a;font-weight:700;">Fertig</span>' : (rActive ? '<span style="color:#d97706;font-weight:700;">In Arbeit</span>' : '<span style="color:#ef4444;font-weight:700;">Offen</span>');
               let comps = (r.components || []).length || (r.devices || []).length || 0;
               return '<tr style="border-bottom:1px solid #e2e8f0;font-size:13px;"><td style="padding:8px 4px;font-weight:600;">' + (r.name || r.id) + '</td><td style="padding:8px 4px;">' + (r.team || "-") + '</td><td style="padding:8px 4px;">' + statusLabel + '</td><td style="padding:8px 4px;text-align:center;">' + comps + '</td><td style="padding:8px 4px;text-align:right;">' + formatSecs(getRoomTotalDurationMs(r)) + '</td></tr>';
@@ -363,6 +438,7 @@ jobs:
             `;
           };
 
+          // Programmieren Rendering
           window.renderProgrammieren = function() {
             let container = document.getElementById("programmierenContainer");
             if (!container) return;
@@ -435,56 +511,11 @@ jobs:
             renderProgrammieren();
           };
 
-          function setupMenuListeners() {
-            document.querySelectorAll("aside.side button:not(#btnPmCockpit):not(#btnPmProg)").forEach(btn => {
-              btn.removeEventListener("click", hidePmViews);
-              btn.addEventListener("click", hidePmViews);
-            });
-
-            let btnCockpit = document.getElementById("btnPmCockpit");
-            if (btnCockpit) {
-              btnCockpit.onclick = function() {
-                document.querySelectorAll("main > div, main > section").forEach(d => {
-                  if (d.id !== "pmCockpitContainer") d.style.display = "none";
-                });
-                let c = document.getElementById("pmCockpitContainer");
-                if (c) { c.style.display = "block"; renderPmCockpit(); }
-              };
-            }
-
-            let btnProg = document.getElementById("btnPmProg");
-            if (btnProg) {
-              btnProg.onclick = function() {
-                document.querySelectorAll("main > div, main > section").forEach(d => {
-                  if (d.id !== "programmierenContainer") d.style.display = "none";
-                });
-                let c = document.getElementById("programmierenContainer");
-                if (c) { c.style.display = "block"; renderProgrammieren(); }
-              };
-            }
-          }
-
-          async function checkRole() {
-            let em = getCurEmail();
-            if (!em) return;
-            try {
-              if (typeof db !== "undefined" && db) {
-                let snap = await db.collection("app_users").doc(em.toLowerCase()).get();
-                if (snap.exists) window.userRoleCache = snap.data();
-              }
-            } catch(e) {}
-
-            let admin = isBoss();
-            let pmNav = document.getElementById("pmNavGroup");
-            if (pmNav) pmNav.style.display = admin ? "block" : "none";
-          }
-
-          window.addEventListener("DOMContentLoaded", () => {
-            setupMenuListeners();
-            setTimeout(checkRole, 500);
-          });
-          setTimeout(setupMenuListeners, 1000);
-          setInterval(checkRole, 3000);
+          // Kontinuierliche Absicherung für UI und Menü
+          setInterval(() => {
+            ensurePmNavExists();
+            injectRoomControls();
+          }, 800);
           </script>"""
 
           import re
@@ -502,6 +533,6 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Ensure robust Firestore room persistence and visible card status indicators" || echo "Keine Aenderung"
+          git commit -m "Fix mobile layout overflow, menu persistence and native dashboard sync" || echo "Keine Aenderung"
           git pull --rebase origin main
           git push origin main
