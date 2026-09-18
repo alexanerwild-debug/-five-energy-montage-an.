@@ -724,7 +724,6 @@ function getAppRooms() {
   return proj.rooms || (proj.project && proj.project.rooms) || [];
 }
 
-// Speichert zuverlässig in Firestore und ruft native App-Rerender auf
 async function persistRoomsOnly() {
   let proj = getAppProject();
   let rooms = getAppRooms();
@@ -751,13 +750,6 @@ async function persistRoomsOnly() {
     if (pid && typeof db !== "undefined" && db) {
       await db.collection("projects").doc(pid).update({ rooms: rooms });
     }
-  } catch(e) {}
-
-  // Native Render der App antriggern, damit das Übersicht-Dashboard direkt aktualisiert wird
-  try {
-    if (typeof renderDashboard === "function") renderDashboard();
-    if (typeof render === "function") render();
-    if (typeof updateStats === "function") updateStats();
   } catch(e) {}
 }
 
@@ -804,7 +796,6 @@ window.startRoomWork = async function(rid) {
     room.workSessions.push({ start: Date.now(), end: null });
   }
 
-  // Alle nativen Status-Felder synchron setzen
   room.status = "in_progress";
   room.montageDone = false;
   room.done = false;
@@ -812,8 +803,8 @@ window.startRoomWork = async function(rid) {
   room.completedAt = null;
 
   await persistRoomsOnly();
-  injectRoomControls();
   if (typeof renderWorkflow === "function") renderWorkflow();
+  else if (typeof render === "function") render();
 };
 
 window.finishRoomWork = async function(rid) {
@@ -834,7 +825,6 @@ window.finishRoomWork = async function(rid) {
     if (!last.end) last.end = now;
   }
 
-  // Native Felder für die Übersicht setzen: 'done' + 'completed' + 'montageDone'
   room.status = "done";
   room.completed = true;
   room.montageDone = true;
@@ -842,8 +832,8 @@ window.finishRoomWork = async function(rid) {
   room.completedAt = now;
 
   await persistRoomsOnly();
-  injectRoomControls();
   if (typeof renderWorkflow === "function") renderWorkflow();
+  else if (typeof render === "function") render();
 };
 
 window.addExtraSession = async function(rid) {
@@ -864,8 +854,8 @@ window.addExtraSession = async function(rid) {
   room.done = false;
 
   await persistRoomsOnly();
-  injectRoomControls();
   if (typeof renderWorkflow === "function") renderWorkflow();
+  else if (typeof render === "function") render();
 };
 
 window.stopExtraSession = async function(rid) {
@@ -885,17 +875,15 @@ window.stopExtraSession = async function(rid) {
   room.completedAt = now;
 
   await persistRoomsOnly();
-  injectRoomControls();
   if (typeof renderWorkflow === "function") renderWorkflow();
+  else if (typeof render === "function") render();
 };
 
-// Saubere, responsive Leiste (kein Überlauf, wrap-fähig)
 window.getRoomStatusSnippet = function(r) {
   let active = isRoomActive(r);
   let isDone = (r.status === "done" || r.status === "completed" || r.montageDone || (r.completedAt && !active));
   let totalMs = getRoomTotalDurationMs(r);
   let timeStr = formatSecs(totalMs);
-  let sessCount = (r.workSessions || []).length;
 
   let badge = '<span style="padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;white-space:nowrap;">Offen</span>';
   if (isDone) {
@@ -920,55 +908,12 @@ window.getRoomStatusSnippet = function(r) {
     btn2 = '<button type="button" class="btn" style="width:auto;padding:5px 10px;margin:2px;font-size:11px;background:#f59e0b;color:#fff;white-space:nowrap;" onclick="event.stopPropagation();stopExtraSession(\'' + r.id + '\')">⏹ Pause</button>';
   }
 
-  return '<div class="room-session-box" data-injected-id="' + r.id + '" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;padding:6px 0;margin:4px 0;width:100%;box-sizing:border-box;">' +
+  return '<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;padding:6px 0;margin:4px 0;width:100%;box-sizing:border-box;">' +
          badge +
          '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' + btn1 + btn2 + '</div>' +
          '</div>';
 };
 
-// Verhindert doppelte Buttons und platziert die Leiste exakt EINMAL pro Raumkarte
-function injectRoomControls() {
-  let rooms = getAppRooms();
-  rooms.forEach(r => {
-    let active = isRoomActive(r);
-    let isDone = (r.status === "done" || r.status === "completed" || r.montageDone || (r.completedAt && !active));
-    let timeStr = formatSecs(getRoomTotalDurationMs(r));
-
-    // Alle Raum-Köpfe finden
-    let elements = document.querySelectorAll(`[data-id="${r.id}"], [data-room-id="${r.id}"]`);
-    if (!elements.length) {
-      // Fallback über Text-Inhalt
-      document.querySelectorAll(".room-header, .room-card, details").forEach(el => {
-        if (r.name && el.textContent.includes(r.name)) {
-          // Bereits vorhanden?
-          let existing = el.querySelector(`.room-session-box[data-injected-id="${r.id}"]`);
-          if (existing) {
-            existing.outerHTML = getRoomStatusSnippet(r);
-          } else {
-            let anchor = el.querySelector("summary, .header, h3, h4") || el;
-            anchor.insertAdjacentHTML("afterend", getRoomStatusSnippet(r));
-          }
-        }
-      });
-    } else {
-      elements.forEach(el => {
-        let existing = el.querySelector(`.room-session-box[data-injected-id="${r.id}"]`);
-        if (existing) {
-          existing.outerHTML = getRoomStatusSnippet(r);
-        } else {
-          el.insertAdjacentHTML("afterbegin", getRoomStatusSnippet(r));
-        }
-      });
-    }
-
-    let timerBadge = document.getElementById("timer-badge-" + r.id);
-    if (timerBadge && active) {
-      timerBadge.textContent = "⏱ In Arbeit (" + timeStr + ")";
-    }
-  });
-}
-
-// Dauerhafter Menü-Wächter: Stellt sicher, dass das PM-Menü NIE verschwindet
 function ensurePmNavExists() {
   let aside = document.querySelector("aside.side");
   if (!aside) return;
@@ -984,29 +929,18 @@ function ensurePmNavExists() {
       <button type="button" id="btnPmProg" style="width:100%;text-align:left;display:flex;align-items:center;gap:6px;padding:8px 10px;margin:2px 0;font-size:13px;font-weight:600;border:none;background:transparent;cursor:pointer;">💻 Programmieren</button>
     `;
     aside.insertBefore(div, aside.firstChild);
-    bindPmButtons();
-  }
 
-  let admin = isBoss();
-  let el = document.getElementById("pmNavGroup");
-  if (el) el.style.display = admin ? "block" : "none";
-}
-
-function bindPmButtons() {
-  let btnCockpit = document.getElementById("btnPmCockpit");
-  if (btnCockpit) {
-    btnCockpit.onclick = function() {
+    let bC = document.getElementById("btnPmCockpit");
+    if (bC) bC.onclick = () => {
       document.querySelectorAll("main > div, main > section").forEach(d => {
         if (d.id !== "pmCockpitContainer") d.style.display = "none";
       });
       let c = document.getElementById("pmCockpitContainer");
       if (c) { c.style.display = "block"; renderPmCockpit(); }
     };
-  }
 
-  let btnProg = document.getElementById("btnPmProg");
-  if (btnProg) {
-    btnProg.onclick = function() {
+    let bP = document.getElementById("btnPmProg");
+    if (bP) bP.onclick = () => {
       document.querySelectorAll("main > div, main > section").forEach(d => {
         if (d.id !== "programmierenContainer") d.style.display = "none";
       });
@@ -1015,20 +949,11 @@ function bindPmButtons() {
     };
   }
 
-  document.querySelectorAll("aside.side button:not(#btnPmCockpit):not(#btnPmProg)").forEach(btn => {
-    btn.onclick = (function(orig) {
-      return function(e) {
-        let c1 = document.getElementById("pmCockpitContainer");
-        let c2 = document.getElementById("programmierenContainer");
-        if (c1) c1.style.display = "none";
-        if (c2) c2.style.display = "none";
-        if (typeof orig === "function") orig.call(this, e);
-      };
-    })(btn.onclick);
-  });
+  let admin = isBoss();
+  let el = document.getElementById("pmNavGroup");
+  if (el) el.style.display = admin ? "block" : "none";
 }
 
-// PM-Cockpit Rendering
 window.renderPmCockpit = function() {
   let container = document.getElementById("pmCockpitContainer");
   if (!container) return;
@@ -1114,7 +1039,6 @@ window.renderPmCockpit = function() {
   `;
 };
 
-// Programmieren Rendering
 window.renderProgrammieren = function() {
   let container = document.getElementById("programmierenContainer");
   if (!container) return;
@@ -1187,11 +1111,20 @@ window.updateProgrammedCount = async function(compName, val) {
   renderProgrammieren();
 };
 
-// Kontinuierliche Absicherung für UI und Menü
+// Nur noch minimaler Timer für das aktive Badge (extrem schonend)
 setInterval(() => {
+  let rooms = getAppRooms();
+  rooms.forEach(r => {
+    if (isRoomActive(r)) {
+      let badge = document.getElementById("timer-badge-" + r.id);
+      if (badge) badge.textContent = "⏱ In Arbeit (" + formatSecs(getRoomTotalDurationMs(r)) + ")";
+    }
+  });
+}, 1000);
+
+window.addEventListener("DOMContentLoaded", () => {
   ensurePmNavExists();
-  injectRoomControls();
-}, 800);
+});
 </script>
 </body>
 </html>
