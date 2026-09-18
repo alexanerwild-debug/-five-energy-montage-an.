@@ -1,4 +1,4 @@
-name: Solid Dashboard and Room Status Patch
+name: Permanent Room Header Patch
 
 on:
   workflow_dispatch:
@@ -7,176 +7,88 @@ permissions:
   contents: write
 
 jobs:
-  patch-solid:
+  patch-core:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verankere Status-Board im HTML und update Raum-Rendering
+      - name: Insert Status Bar Directly into wfRoomHtml Source
         run: |
-          python3 -c '
+          python3 - << 'EOF'
           with open("index.html", "r", encoding="utf-8") as f:
               content = f.read()
 
-          # 1. Status-Kasten direkt fest in das Dashboard-HTML einbetten
-          board_html = """<div id="adminStatusBoard" style="margin: 16px 0; padding: 16px; background: #f8fafc; border-radius: 10px; border: 1px solid #cbd5e1;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-              <b style="color: #1e293b; font-size: 15px;">📊 Status-Übersicht Montage</b>
-              <span style="font-size: 12px; color: #64748b;">Live</span>
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;">
-              <div style="background: #fee2e2; color: #ef4444; padding: 10px 6px; border-radius: 8px;">
-                <b id="countOpen" style="font-size: 20px;">0</b>
-                <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; margin-top: 2px;">Offen</div>
-              </div>
-              <div style="background: #fef3c7; color: #d97706; padding: 10px 6px; border-radius: 8px;">
-                <b id="countProgress" style="font-size: 20px;">0</b>
-                <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; margin-top: 2px;">In Arbeit</div>
-              </div>
-              <div style="background: #dcfce7; color: #16a34a; padding: 10px 6px; border-radius: 8px;">
-                <b id="countDone" style="font-size: 20px;">0</b>
-                <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; margin-top: 2px;">Fertig</div>
-              </div>
-            </div>
-          </div>"""
-
-          if "id=\"adminStatusBoard\"" not in content:
-              content = content.replace("<div class=\"grid\" id=\"stats\"></div>", "<div class=\"grid\" id=\"stats\"></div>\n" + board_html)
-
-          # 2. Skript-Ergänzung für Live-Update und Start/Fertig-Buttons
-          script_code = """<script id="roles-dashboard-system">
-          window.SUPER_ADMIN_EMAIL = "alexaner.wild@gmail.com";
-          window.userRoleCache = null;
-
-          function getCurEmail() {
-            try { return (typeof authEmail === "function" && authEmail()) || (currentUser && currentUser.email) || ""; }
-            catch(e) { return ""; }
-          }
-
-          function isBoss() {
-            let em = (getCurEmail() || "").toLowerCase().trim();
-            return em === window.SUPER_ADMIN_EMAIL.toLowerCase().trim() || (window.userRoleCache && window.userRoleCache.role === "admin");
-          }
-
-          function getMyTeam() {
-            if (isBoss()) return null;
-            if (window.userRoleCache && window.userRoleCache.team) return window.userRoleCache.team;
-            let em = getCurEmail();
-            return em ? em.split("@")[0] : null;
-          }
-
-          async function checkRole() {
-            let em = getCurEmail();
-            if (!em) return;
-            try {
-              if (typeof db !== "undefined" && db) {
-                let snap = await db.collection("app_users").doc(em.toLowerCase()).get();
-                if (snap.exists) window.userRoleCache = snap.data();
-              }
-            } catch(err) {}
-
-            let admin = isBoss();
-            document.querySelectorAll("aside.side button[data-tab]").forEach(btn => {
-              let tab = btn.getAttribute("data-tab");
-              if (!admin && (tab === "projekte" || tab === "teams" || tab === "finanzen")) {
-                btn.style.display = "none";
-              } else {
-                btn.style.display = "";
-              }
-            });
-          }
-
-          if (typeof auth !== "undefined" && auth) {
-            auth.onAuthStateChanged(() => setTimeout(checkRole, 300));
-          }
-
+          # 1. Start- und Finish-Funktionen global bereitstellen
+          functions_code = """
+          <script id="room-actions-runtime">
           window.startRoomWork = async function(rid) {
-            let proj = (typeof p === "function") ? p() : null;
-            let rooms = proj ? (proj.rooms || (proj.project && proj.project.rooms) || []) : [];
-            let room = rooms.find(x => x.id === rid);
-            if (!room) return;
-            room.startedAt = Date.now();
-            room.status = "in_progress";
-            await fsProject().update({ rooms: rooms });
-            if (typeof render === "function") render();
+            try {
+              let proj = (typeof p === "function") ? p() : null;
+              let rooms = proj ? (proj.rooms || (proj.project && proj.project.rooms) || []) : [];
+              let room = rooms.find(x => x.id === rid);
+              if (!room) return;
+              room.startedAt = Date.now();
+              room.status = "in_progress";
+              if (typeof fsProject === "function") await fsProject().update({ rooms: rooms });
+              if (typeof render === "function") render();
+              else if (typeof renderWorkflow === "function") renderWorkflow();
+            } catch(e) { console.error(e); }
           };
 
           window.finishRoomWork = async function(rid) {
-            let proj = (typeof p === "function") ? p() : null;
-            let rooms = proj ? (proj.rooms || (proj.project && proj.project.rooms) || []) : [];
-            let room = rooms.find(x => x.id === rid);
-            if (!room) return;
-            room.completedAt = Date.now();
-            room.status = "completed";
-            await fsProject().update({ rooms: rooms });
-            if (typeof render === "function") render();
-          };
-
-          // Patch wfRoomHtml
-          if (typeof wfRoomHtml === "function") {
-            const origWf = wfRoomHtml;
-            wfRoomHtml = function(r, mode) {
-              let t = getMyTeam();
-              if (t && r.team && r.team.trim() !== "" && r.team.toLowerCase().trim() !== t.toLowerCase().trim()) return "";
-              let html = origWf(r, mode);
-
-              let badge = "<span style=\"display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;\">Offen</span>";
-              if (r.completedAt || r.status === "completed") {
-                badge = "<span style=\"display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;\">Fertig</span>";
-              } else if (r.startedAt || r.status === "in_progress") {
-                badge = "<span style=\"display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;\">In Arbeit</span>";
-              }
-
-              let btn = "";
-              if (!r.startedAt) {
-                btn = "<button type=\"button\" class=\"btn green\" style=\"width:auto;padding:6px 14px;margin:0;font-size:12px;\" onclick=\"startRoomWork(\x27" + r.id + "\x27)\">▶ Start</button>";
-              } else if (!r.completedAt) {
-                btn = "<button type=\"button\" class=\"btn green\" style=\"width:auto;padding:6px 14px;margin:0;font-size:12px;background:#10b981;\" onclick=\"finishRoomWork(\x27" + r.id + "\x27)\">✔ Fertig</button>";
-              }
-
-              let controlRow = "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 0;margin:6px 0;border-bottom:1px solid #e2e8f0;\">" + badge + btn + "</div>";
-              return html.replace(/<div class="wfHead">/, "<div class=\"wfHead\">" + controlRow);
-            };
-          }
-
-          function refreshLiveCounters() {
-            let rooms = [];
             try {
               let proj = (typeof p === "function") ? p() : null;
-              if (proj) rooms = proj.rooms || (proj.project && proj.project.rooms) || [];
-              if (!rooms.length && typeof project !== "undefined" && project) rooms = project.rooms || [];
-            } catch(e) {}
+              let rooms = proj ? (proj.rooms || (proj.project && proj.project.rooms) || []) : [];
+              let room = rooms.find(x => x.id === rid);
+              if (!room) return;
+              room.completedAt = Date.now();
+              room.status = "completed";
+              if (typeof fsProject === "function") await fsProject().update({ rooms: rooms });
+              if (typeof render === "function") render();
+              else if (typeof renderWorkflow === "function") renderWorkflow();
+            } catch(e) { console.error(e); }
+          };
 
-            let total = rooms.length;
-            let comp = rooms.filter(r => r.completedAt || r.status === "completed").length;
-            let inP = rooms.filter(r => (r.startedAt && !r.completedAt) || r.status === "in_progress").length;
-            let op = total > 0 ? Math.max(0, total - comp - inP) : 0;
+          window.getRoomStatusSnippet = function(r) {
+            let badge = '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;">Offen</span>';
+            if (r.completedAt || r.status === "completed") {
+              badge = '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;">Fertig</span>';
+            } else if (r.startedAt || r.status === "in_progress") {
+              badge = '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;">In Arbeit</span>';
+            }
 
-            let cO = document.getElementById("countOpen");
-            let cP = document.getElementById("countProgress");
-            let cD = document.getElementById("countDone");
-            if (cO) cO.textContent = op;
-            if (cP) cP.textContent = inP;
-            if (cD) cD.textContent = comp;
-          }
+            let btn = "";
+            if (!r.startedAt) {
+              btn = '<button type="button" class="btn green" style="width:auto;padding:5px 12px;margin:0;font-size:12px;" onclick="event.stopPropagation();startRoomWork(\\'' + r.id + '\\')">▶ Start</button>';
+            } else if (!r.completedAt) {
+              btn = '<button type="button" class="btn green" style="width:auto;padding:5px 12px;margin:0;font-size:12px;background:#10b981;" onclick="event.stopPropagation();finishRoomWork(\\'' + r.id + '\\')">✔ Fertig</button>';
+            }
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + btn + '</div>';
+          };
+          </script>
+          """
 
-          setInterval(refreshLiveCounters, 1000);
-          </script>"""
-
-          import re
-          if "id=\"roles-dashboard-system\"" in content:
-              content = re.sub(r"<script id=\"roles-dashboard-system\">[\s\S]*?<\/script>", script_code, content)
+          if 'id="room-actions-runtime"' in content:
+              import re
+              content = re.sub(r'<script id="room-actions-runtime">[\s\S]*?<\/script>', functions_code.strip(), content)
           else:
-              content = content.replace("</body>", script_code + "\n</body>")
+              content = content.replace("</head>", functions_code.strip() + "\n</head>")
+
+          # 2. Direkt in wfRoomHtml verankern
+          # Ersetzt die wfHead-Zeile durch das dynamische Status-Snippet
+          old_wfhead = '<div class="wfHead">'
+          new_wfhead = '<div class="wfHead">${typeof getRoomStatusSnippet === "function" ? getRoomStatusSnippet(r) : ""}'
+          if old_wfhead in content and new_wfhead not in content:
+              content = content.replace(old_wfhead, new_wfhead)
 
           with open("index.html", "w", encoding="utf-8") as f:
               f.write(content)
-          '
+          EOF
 
       - name: Speichern
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Insert static status board into dashboard and room control row" || echo "Keine Aenderung"
+          git commit -m "Permanently insert status snippet into wfRoomHtml template" || echo "Keine Aenderung"
           git push
