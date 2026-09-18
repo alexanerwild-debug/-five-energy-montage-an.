@@ -1,4 +1,4 @@
-name: Restore Original Navigation and Safe Inject
+name: Fix Room Data Integrity and Add Separate Multi-Session Buttons
 
 on:
   workflow_dispatch:
@@ -7,61 +7,19 @@ permissions:
   contents: write
 
 jobs:
-  restore-clean:
+  fix-data-and-buttons:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Restore Original Aside and Inject PM Tabs Safely
+      - name: Inject Safe Room Storage and Separate Session Controls
         run: |
           python3 - << 'EOF'
-          import subprocess
-          import re
+          with open("index.html", "r", encoding="utf-8") as f:
+              content = f.read()
 
-          # 1. Ursprüngliche index.html aus Commit vor Navigationsänderung holen
-          commits = subprocess.check_output(["git", "log", "--format=%H", "-n", "20"]).decode().split()
-          orig_content = None
-          for c in commits:
-              try:
-                  cand = subprocess.check_output(["git", "show", f"{c}:index.html"]).decode("utf-8")
-                  # Finde die Version vor dem Umbau des Seitenmenüs
-                  if "openNativeTab" not in cand and "switchAppTab" not in cand and '<aside class="side">' in cand:
-                      orig_content = cand
-                      print(f"Originales Menü aus Commit {c} geladen.")
-                      break
-              except Exception:
-                  continue
-
-          if not orig_content:
-              with open("index.html", "r", encoding="utf-8") as f:
-                  orig_content = f.read()
-
-          # Entferne injizierte Reste
-          content = re.sub(r'<script id="roles-dashboard-system">[\s\S]*?<\/script>', '', orig_content)
-          content = re.sub(r'<script id="room-actions-runtime">[\s\S]*?<\/script>', '', content)
-          content = content.replace('<div id="pmCockpitContainer" style="display:none;"></div>', '')
-          content = content.replace('<div id="programmierenContainer" style="display:none;"></div>', '')
-
-          # 2. PM-Buttons ganz oben in das originale <aside class="side"> einhängen (ohne die bestehenden Buttons anzufassen)
-          pm_nav_buttons = """<aside class="side">
-            <div id="pmNavGroup" style="display:none;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #cbd5e1;">
-              <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 8px;text-transform:uppercase;">Projektleiter</div>
-              <button type="button" id="btnPmCockpit" style="width:100%;text-align:left;display:flex;align-items:center;gap:6px;padding:8px 10px;margin:2px 0;font-size:13px;font-weight:600;border:none;background:transparent;cursor:pointer;">📊 Cockpit</button>
-              <button type="button" id="btnPmProg" style="width:100%;text-align:left;display:flex;align-items:center;gap:6px;padding:8px 10px;margin:2px 0;font-size:13px;font-weight:600;border:none;background:transparent;cursor:pointer;">💻 Programmieren</button>
-            </div>"""
-
-          content = content.replace('<aside class="side">', pm_nav_buttons)
-
-          # 3. View-Container für Cockpit und Programmieren einfügen
-          containers = """
-          <div id="pmCockpitContainer" style="display:none;"></div>
-          <div id="programmierenContainer" style="display:none;"></div>
-          """
-          content = content.replace("</main>", containers + "\n</main>")
-
-          # 4. Sicheres Steuer-Skript einhängen
           script_payload = """<script id="roles-dashboard-system">
           window.SUPER_ADMIN_EMAIL = "alexaner.wild@gmail.com";
           window.userRoleCache = null;
@@ -90,17 +48,20 @@ jobs:
             return proj.rooms || (proj.project && proj.project.rooms) || [];
           }
 
-          async function persistData() {
+          // Sicherer Speicherpfad: Nur die Raeume partiell updaten, damit kein Datenverlust entsteht
+          async function persistRoomsOnly() {
             try {
-              let proj = getAppProject();
+              let rooms = getAppRooms();
               if (typeof fsProject === "function") {
-                await fsProject().set(proj, { merge: true });
+                await fsProject().update({ rooms: rooms });
+              } else if (typeof db !== "undefined" && db && typeof curProjectId !== "undefined") {
+                await db.collection("projects").doc(curProjectId).update({ rooms: rooms });
               } else if (typeof save === "function") {
                 await save();
-              } else if (typeof db !== "undefined" && db && typeof curProjectId !== "undefined") {
-                await db.collection("projects").doc(curProjectId).set(proj, { merge: true });
               }
-            } catch(err) {}
+            } catch(err) {
+              console.error("Fehler beim Speichern der Raeume:", err);
+            }
           }
 
           window.formatSecs = function(ms) {
@@ -135,6 +96,7 @@ jobs:
             return (r.status === "in_progress" || (r.startedAt && !r.completedAt));
           };
 
+          // 1. Basis-Ablauf: Start
           window.startRoomWork = async function(rid) {
             let rooms = getAppRooms();
             let room = rooms.find(x => x.id === rid);
@@ -142,21 +104,22 @@ jobs:
 
             if (!room.workSessions) {
               room.workSessions = [];
-              if (room.startedAt) room.workSessions.push({ start: room.startedAt, end: room.completedAt || null });
             }
-
             let last = room.workSessions[room.workSessions.length - 1];
-            if (!last || last.end) room.workSessions.push({ start: Date.now(), end: null });
+            if (!last || last.end) {
+              room.workSessions.push({ start: Date.now(), end: null });
+            }
 
             room.status = "in_progress";
             if (!room.startedAt) room.startedAt = Date.now();
             room.completedAt = null;
 
-            await persistData();
+            await persistRoomsOnly();
             if (typeof renderWorkflow === "function") renderWorkflow();
             else if (typeof render === "function") render();
           };
 
+          // 2. Basis-Ablauf: Fertigstellen (mit Sperre bei offener Klaerung)
           window.finishRoomWork = async function(rid) {
             let rooms = getAppRooms();
             let room = rooms.find(x => x.id === rid);
@@ -178,16 +141,56 @@ jobs:
             room.status = "completed";
             room.completedAt = now;
 
-            await persistData();
+            await persistRoomsOnly();
             if (typeof renderWorkflow === "function") renderWorkflow();
             else if (typeof render === "function") render();
           };
 
+          // 3. Zusaetzlicher Arbeitsabschnitt: Neuer Button
+          window.addExtraSession = async function(rid) {
+            let rooms = getAppRooms();
+            let room = rooms.find(x => x.id === rid);
+            if (!room) return;
+
+            if (!room.workSessions) {
+              room.workSessions = [];
+              if (room.startedAt) {
+                room.workSessions.push({ start: room.startedAt, end: room.completedAt || Date.now() });
+              }
+            }
+
+            room.workSessions.push({ start: Date.now(), end: null });
+            room.status = "in_progress";
+
+            await persistRoomsOnly();
+            if (typeof renderWorkflow === "function") renderWorkflow();
+            else if (typeof render === "function") render();
+          };
+
+          // 4. Zusaetzlichen Arbeitsabschnitt wieder stoppen
+          window.stopExtraSession = async function(rid) {
+            let rooms = getAppRooms();
+            let room = rooms.find(x => x.id === rid);
+            if (!room) return;
+
+            let now = Date.now();
+            if (room.workSessions && room.workSessions.length > 0) {
+              let last = room.workSessions[room.workSessions.length - 1];
+              if (!last.end) last.end = now;
+            }
+
+            await persistRoomsOnly();
+            if (typeof renderWorkflow === "function") renderWorkflow();
+            else if (typeof render === "function") render();
+          };
+
+          // UI-Rendering Snippet fuer jeden Raum mit 2 getrennten Buttons
           window.getRoomStatusSnippet = function(r) {
             let active = isRoomActive(r);
             let isDone = (r.status === "completed" || (r.completedAt && !active));
             let totalMs = getRoomTotalDurationMs(r);
             let timeStr = formatSecs(totalMs);
+            let sessCount = (r.workSessions || []).length;
 
             let badge = '<span style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;">Offen</span>';
             if (isDone) {
@@ -196,19 +199,28 @@ jobs:
               badge = '<span id="timer-badge-' + r.id + '" style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;">⏱ In Arbeit (' + timeStr + ')</span>';
             }
 
-            let btns = "";
+            // Button 1: Alter Button bleibt unberuehrt
+            let btn1 = "";
             if (!active && !isDone) {
-              btns = '<button type="button" class="btn green" style="width:auto;padding:6px 14px;margin:0;font-size:12px;" onclick="event.stopPropagation();startRoomWork(\\'' + r.id + '\\')">▶ Start</button>';
-            } else if (active) {
-              btns = '<button type="button" class="btn green" style="width:auto;padding:6px 14px;margin:0;font-size:12px;background:#10b981;" onclick="event.stopPropagation();finishRoomWork(\\'' + r.id + '\\')">✔ Fertig</button>';
-            } else if (isDone) {
-              btns = '<button type="button" class="btn" style="width:auto;padding:6px 14px;margin:0;font-size:12px;background:#3b82f6;color:#fff;" onclick="event.stopPropagation();startRoomWork(\\'' + r.id + '\\')">✏️ Weiterbearbeiten</button>';
+              btn1 = '<button type="button" class="btn green" style="width:auto;padding:6px 12px;margin:0;font-size:12px;" onclick="event.stopPropagation();startRoomWork(\\'' + r.id + '\\')">▶ Start</button>';
+            } else if (active && !r.completedAt) {
+              btn1 = '<button type="button" class="btn green" style="width:auto;padding:6px 12px;margin:0;font-size:12px;background:#10b981;" onclick="event.stopPropagation();finishRoomWork(\\'' + r.id + '\\')">✔ Fertig</button>';
+            } else {
+              btn1 = '<button type="button" class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:12px;background:#e2e8f0;color:#64748b;cursor:default;" disabled>✔ Abgeschlossen</button>';
             }
 
-            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + btns + '</div>';
+            // Button 2: Zusaetzlicher Button daneben fuer weitere Arbeitssitzungen
+            let btn2 = "";
+            if (isDone) {
+              btn2 = '<button type="button" class="btn" style="width:auto;padding:6px 12px;margin-left:6px;font-size:12px;background:#3b82f6;color:#fff;" onclick="event.stopPropagation();addExtraSession(\\'' + r.id + '\\')">➕ Nacharbeit / Session ' + (sessCount + 1) + '</button>';
+            } else if (active && r.completedAt) {
+              btn2 = '<button type="button" class="btn" style="width:auto;padding:6px 12px;margin-left:6px;font-size:12px;background:#f59e0b;color:#fff;" onclick="event.stopPropagation();stopExtraSession(\\'' + r.id + '\\')">⏹ Session beenden</button>';
+            }
+
+            return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + '<div style="display:flex;align-items:center;">' + btn1 + btn2 + '</div></div>';
           };
 
-          // Sekundentakt für aktive Räume
+          // Live Sekundentakt
           setInterval(() => {
             let rooms = getAppRooms();
             rooms.forEach(r => {
@@ -372,13 +384,15 @@ jobs:
             if (!proj) return;
             if (!proj.programmedComponents) proj.programmedComponents = {};
             proj.programmedComponents[compName] = parseInt(val, 10) || 0;
-            await persistData();
+            try {
+              if (typeof fsProject === "function") {
+                await fsProject().update({ programmedComponents: proj.programmedComponents });
+              }
+            } catch(e){}
             renderProgrammieren();
           };
 
-          // Event Listener an Original-Buttons und PM-Buttons binden
           function setupMenuListeners() {
-            // Alle Original-Buttons schalten PM-Views wieder aus
             document.querySelectorAll("aside.side button:not(#btnPmCockpit):not(#btnPmProg)").forEach(btn => {
               btn.removeEventListener("click", hidePmViews);
               btn.addEventListener("click", hidePmViews);
@@ -430,7 +444,11 @@ jobs:
           setInterval(checkRole, 3000);
           </script>"""
 
-          content = content.replace("</body>", script_payload + "\n</body>")
+          import re
+          if 'id="roles-dashboard-system"' in content:
+              content = re.sub(r'<script id="roles-dashboard-system">[\s\S]*?<\/script>', script_payload.strip(), content)
+          else:
+              content = content.replace("</body>", script_payload.strip() + "\n</body>")
 
           with open("index.html", "w", encoding="utf-8") as f:
               f.write(content)
@@ -441,6 +459,6 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Restore original native navigation and hook PM safely" || echo "Keine Aenderung"
+          git commit -m "Fix room data integrity and add separate session buttons" || echo "Keine Aenderung"
           git pull --rebase origin main
           git push origin main
