@@ -69,6 +69,52 @@ function checkMonteurVisibility() {
 setInterval(checkMonteurVisibility, 250);
 </script>
 
+<script id="room-actions-runtime">
+window.startRoomWork = async function(rid) {
+  try {
+    let proj = (typeof p === "function") ? p() : null;
+    let rooms = proj ? (proj.rooms || (proj.project && proj.project.rooms) || []) : [];
+    let room = rooms.find(x => x.id === rid);
+    if (!room) return;
+    room.startedAt = Date.now();
+    room.status = "in_progress";
+    if (typeof fsProject === "function") await fsProject().update({ rooms: rooms });
+    if (typeof render === "function") render();
+    else if (typeof renderWorkflow === "function") renderWorkflow();
+  } catch(e) { console.error(e); }
+};
+
+window.finishRoomWork = async function(rid) {
+  try {
+    let proj = (typeof p === "function") ? p() : null;
+    let rooms = proj ? (proj.rooms || (proj.project && proj.project.rooms) || []) : [];
+    let room = rooms.find(x => x.id === rid);
+    if (!room) return;
+    room.completedAt = Date.now();
+    room.status = "completed";
+    if (typeof fsProject === "function") await fsProject().update({ rooms: rooms });
+    if (typeof render === "function") render();
+    else if (typeof renderWorkflow === "function") renderWorkflow();
+  } catch(e) { console.error(e); }
+};
+
+window.getRoomStatusSnippet = function(r) {
+  let badge = '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;">Offen</span>';
+  if (r.completedAt || r.status === "completed") {
+    badge = '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;">Fertig</span>';
+  } else if (r.startedAt || r.status === "in_progress") {
+    badge = '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;">In Arbeit</span>';
+  }
+
+  let btn = "";
+  if (!r.startedAt) {
+    btn = '<button type="button" class="btn green" style="width:auto;padding:5px 12px;margin:0;font-size:12px;" onclick="event.stopPropagation();startRoomWork(\'' + r.id + '\')">▶ Start</button>';
+  } else if (!r.completedAt) {
+    btn = '<button type="button" class="btn green" style="width:auto;padding:5px 12px;margin:0;font-size:12px;background:#10b981;" onclick="event.stopPropagation();finishRoomWork(\'' + r.id + '\')">✔ Fertig</button>';
+  }
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + btn + '</div>';
+};
+</script>
 </head><body>
 <div id="loginGate" class="loginGate">
  <div class="loginCard">
@@ -290,14 +336,14 @@ function wfClarify(r,it,mode){
 }
 function wfItemHtml(r,it,n,mode){
  let after=mode==="after";
- return `<div class="wfItem"><div class="wfHead"><div class="wfTitle">${wfEsc(it.type)} <span class="small">#${n+1}</span></div>${!after&&it.createdBy===authUid()?`<button class="wfRemove" onclick="wfRemove('${r.id}','${it.id}')">Entfernen</button>`:""}</div>
+ return `<div class="wfItem"><div class="wfHead">${typeof getRoomStatusSnippet === "function" ? getRoomStatusSnippet(r) : ""}<div class="wfTitle">${wfEsc(it.type)} <span class="small">#${n+1}</span></div>${!after&&it.createdBy===authUid()?`<button class="wfRemove" onclick="wfRemove('${r.id}','${it.id}')">Entfernen</button>`:""}</div>
  ${after?(it.note?`<div class="card" style="padding:9px;margin:9px 0"><b>Notiz aus der Aufnahme</b><div>${wfEsc(it.note)}</div></div>`:"")+`<div class="wfPhotoPair">${wfPhotoBox(r,it,"before")}${wfPhotoBox(r,it,"after")}</div>`:wfPhotoBox(r,it,"before")+`<textarea class="wfNote" placeholder="Notiz zur Einbausituation / Besonderheiten" onchange="wfSet('${r.id}','${it.id}','note',this.value)">${wfEsc(it.note||"")}</textarea>`}
  ${wfClarify(r,it,mode)}</div>`
 }
 function wfRoomHtml(r,mode){
  let items=wfItems(r),after=mode==="after",complete=items.length>0&&items.every(x=>x.after);
  let opts=C.map(c=>`<option value="${wfEsc(c)}">${wfEsc(c)}</option>`).join("");
- return `<div class="wfRoom" id="wf_${r.id}"><div class="wfHead"><div><b>${roomTitle(r)}</b><div class="small">${wfEsc(r.team||"")}${r.note?" · "+wfEsc(r.note):""}</div></div>${after&&complete?'<span class="wfDone">✓ fertig</span>':""}</div>
+ return `<div class="wfRoom" id="wf_${r.id}"><div class="wfHead">${typeof getRoomStatusSnippet === "function" ? getRoomStatusSnippet(r) : ""}<div><b>${roomTitle(r)}</b><div class="small">${wfEsc(r.team||"")}${r.note?" · "+wfEsc(r.note):""}</div></div>${after&&complete?'<span class="wfDone">✓ fertig</span>':""}</div>
  ${!after?`<div class="addComp"><select id="wfsel_${r.id}"><option value="">Komponente auswählen …</option>${opts}</select><button class="btn green" style="margin:0" onclick="let e=document.getElementById('wfsel_${r.id}');wfAdd('${r.id}',e.value)">+ Hinzufügen</button></div>`:""}
  ${items.length?items.map((it,n)=>wfItemHtml(r,it,n,mode)).join(""):`<div class="small" style="padding:12px 0">Noch keine Komponenten aufgenommen.</div>`}</div>`
 }
@@ -404,7 +450,7 @@ function renderMainComponents(){
  let a=ensureMainComponents();
  el.innerHTML=`<div class="mcToolbar"><button class="btn green" onclick="mcAdd('Unit')">+ Unit</button><button class="btn green" onclick="mcAdd('CCU')">+ CCU</button><button class="btn green" onclick="mcAdd('Repeater')">+ Repeater</button><button class="btn green" onclick="mcAdd('Layer2')">+ Layer2</button></div>
  <div class="small">${a.length} ⚡ Hauptkomponenten erfasst</div>`+
- a.map((it,n)=>`<div class="mcCard"><div class="wfHead"><div><b>${wfEsc(it.type)} #${a.filter(x=>x.type===it.type).indexOf(it)+1}</b><div class="small">angelegt von ${wfEsc(it.createdByEmail||"unbekannt")}</div></div>${it.createdBy===authUid()?`<button class="mcDelete" onclick="mcDelete('${it.id}')">Löschen</button>`:""}</div>
+ a.map((it,n)=>`<div class="mcCard"><div class="wfHead">${typeof getRoomStatusSnippet === "function" ? getRoomStatusSnippet(r) : ""}<div><b>${wfEsc(it.type)} #${a.filter(x=>x.type===it.type).indexOf(it)+1}</b><div class="small">angelegt von ${wfEsc(it.createdByEmail||"unbekannt")}</div></div>${it.createdBy===authUid()?`<button class="mcDelete" onclick="mcDelete('${it.id}')">Löschen</button>`:""}</div>
  <div class="wfPhotoPair">${mcPhotoBox(it,"before")}${mcPhotoBox(it,"after")}</div>
  <textarea class="wfNote" placeholder="Notiz / Einbauort" onchange="mcSet('${it.id}','note',this.value)">${wfEsc(it.note||"")}</textarea>
  <div class="mcStatus">
@@ -776,7 +822,7 @@ if (typeof wfRoomHtml === "function") {
     }
 
     let controlRow = "<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;margin:6px 0;border-bottom:1px solid #e2e8f0;">" + badge + btn + "</div>";
-    return html.replace(/<div class="wfHead">/, "<div class="wfHead">" + controlRow);
+    return html.replace(/<div class="wfHead">${typeof getRoomStatusSnippet === "function" ? getRoomStatusSnippet(r) : ""}/, "<div class="wfHead">${typeof getRoomStatusSnippet === "function" ? getRoomStatusSnippet(r) : ""}" + controlRow);
   };
 }
 
