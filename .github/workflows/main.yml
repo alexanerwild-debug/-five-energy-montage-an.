@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Insert Status Bar Directly into wfRoomHtml Source
         run: |
@@ -18,7 +20,6 @@ jobs:
           with open("index.html", "r", encoding="utf-8") as f:
               content = f.read()
 
-          # 1. Start- und Finish-Funktionen global bereitstellen
           functions_code = """
           <script id="room-actions-runtime">
           window.startRoomWork = async function(rid) {
@@ -74,8 +75,6 @@ jobs:
           else:
               content = content.replace("</head>", functions_code.strip() + "\n</head>")
 
-          # 2. Direkt in wfRoomHtml verankern
-          # Ersetzt die wfHead-Zeile durch das dynamische Status-Snippet
           old_wfhead = '<div class="wfHead">'
           new_wfhead = '<div class="wfHead">${typeof getRoomStatusSnippet === "function" ? getRoomStatusSnippet(r) : ""}'
           if old_wfhead in content and new_wfhead not in content:
@@ -89,6 +88,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
+          git pull --rebase origin main
           git add index.html
           git commit -m "Permanently insert status snippet into wfRoomHtml template" || echo "Keine Aenderung"
-          git push
+          git push origin main
