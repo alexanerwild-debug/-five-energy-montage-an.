@@ -1,4 +1,4 @@
-name: Restore Original Navigation and Mount PM Views Cleanly
+name: Restore Original Navigation and Safe Inject
 
 on:
   workflow_dispatch:
@@ -7,58 +7,62 @@ permissions:
   contents: write
 
 jobs:
-  fix-nav:
+  restore-clean:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Restore Native App Navigation and Wire PM Views
+      - name: Restore Original Aside and Inject PM Tabs Safely
         run: |
           python3 - << 'EOF'
-          with open("index.html", "r", encoding="utf-8") as f:
-              content = f.read()
-
-          # 1. Native aside.side mit den originalen setTab-Aufrufen und PM-Erweiterung
-          clean_aside = """<aside class="side">
-            <div style="font-weight:800;font-size:16px;padding:12px;background:#1e293b;color:#fff;border-radius:6px;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
-              ⚡ FIV.Energy
-            </div>
-
-            <!-- PROJEKTLEITER BEREICH (nur für Admin sichtbar) -->
-            <div class="pm-only" style="margin-bottom: 12px;">
-              <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 8px;text-transform:uppercase;letter-spacing:0.5px;">Projektleiter</div>
-              <button type="button" data-tab="pm-cockpit" onclick="openPmTab('pm-cockpit', this)">📊 Projektleiter-Cockpit</button>
-              <button type="button" data-tab="programmieren" onclick="openPmTab('programmieren', this)">💻 Programmieren</button>
-              <button type="button" data-tab="projekte" onclick="setTab('projekte', this)">📁 Projekte & Archiv</button>
-              <button type="button" data-tab="teams" onclick="setTab('teams', this)">👥 Teams</button>
-            </div>
-
-            <!-- ABWICKLUNG / BAUSTELLE -->
-            <div style="margin-bottom: 12px;">
-              <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 8px;text-transform:uppercase;letter-spacing:0.5px;">Abwicklung / Baustelle</div>
-              <button type="button" data-tab="dash" class="active" onclick="openNativeTab('dash', this)">🏠 Übersicht</button>
-              <button type="button" data-tab="survey" onclick="openNativeTab('survey', this)">📝 Aufnahme Räume</button>
-              <button type="button" data-tab="wf" onclick="openNativeTab('wf', this)">🔧 Montage</button>
-              <button type="button" data-tab="plans" onclick="openNativeTab('plans', this)">🗺️ Pläne</button>
-            </div>
-
-            <!-- WISSEN & VORBEREITUNG -->
-            <div style="margin-bottom: 12px;">
-              <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 8px;text-transform:uppercase;letter-spacing:0.5px;">Wissen & Vorbereitung</div>
-              <button type="button" data-tab="components" onclick="openNativeTab('components', this)">📦 Komponenten</button>
-              <button type="button" data-tab="anlernprozess" onclick="openNativeTab('anlernprozess', this)">🔄 Anlernprozess</button>
-              <button type="button" data-tab="prep" onclick="openNativeTab('prep', this)">🧰 Arbeitsvorbereitung</button>
-              <button type="button" data-tab="guides" onclick="openNativeTab('guides', this)">📖 Montageanleitungen</button>
-            </div>
-          </aside>"""
-
+          import subprocess
           import re
-          content = re.sub(r'<aside class="side">[\s\S]*?<\/aside>', clean_aside, content)
 
-          # 2. Native Brücke & PM Logik
-          pm_system_script = """<script id="roles-dashboard-system">
+          # 1. Ursprüngliche index.html aus Commit vor Navigationsänderung holen
+          commits = subprocess.check_output(["git", "log", "--format=%H", "-n", "20"]).decode().split()
+          orig_content = None
+          for c in commits:
+              try:
+                  cand = subprocess.check_output(["git", "show", f"{c}:index.html"]).decode("utf-8")
+                  # Finde die Version vor dem Umbau des Seitenmenüs
+                  if "openNativeTab" not in cand and "switchAppTab" not in cand and '<aside class="side">' in cand:
+                      orig_content = cand
+                      print(f"Originales Menü aus Commit {c} geladen.")
+                      break
+              except Exception:
+                  continue
+
+          if not orig_content:
+              with open("index.html", "r", encoding="utf-8") as f:
+                  orig_content = f.read()
+
+          # Entferne injizierte Reste
+          content = re.sub(r'<script id="roles-dashboard-system">[\s\S]*?<\/script>', '', orig_content)
+          content = re.sub(r'<script id="room-actions-runtime">[\s\S]*?<\/script>', '', content)
+          content = content.replace('<div id="pmCockpitContainer" style="display:none;"></div>', '')
+          content = content.replace('<div id="programmierenContainer" style="display:none;"></div>', '')
+
+          # 2. PM-Buttons ganz oben in das originale <aside class="side"> einhängen (ohne die bestehenden Buttons anzufassen)
+          pm_nav_buttons = """<aside class="side">
+            <div id="pmNavGroup" style="display:none;margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #cbd5e1;">
+              <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 8px;text-transform:uppercase;">Projektleiter</div>
+              <button type="button" id="btnPmCockpit" style="width:100%;text-align:left;display:flex;align-items:center;gap:6px;padding:8px 10px;margin:2px 0;font-size:13px;font-weight:600;border:none;background:transparent;cursor:pointer;">📊 Cockpit</button>
+              <button type="button" id="btnPmProg" style="width:100%;text-align:left;display:flex;align-items:center;gap:6px;padding:8px 10px;margin:2px 0;font-size:13px;font-weight:600;border:none;background:transparent;cursor:pointer;">💻 Programmieren</button>
+            </div>"""
+
+          content = content.replace('<aside class="side">', pm_nav_buttons)
+
+          # 3. View-Container für Cockpit und Programmieren einfügen
+          containers = """
+          <div id="pmCockpitContainer" style="display:none;"></div>
+          <div id="programmierenContainer" style="display:none;"></div>
+          """
+          content = content.replace("</main>", containers + "\n</main>")
+
+          # 4. Sicheres Steuer-Skript einhängen
+          script_payload = """<script id="roles-dashboard-system">
           window.SUPER_ADMIN_EMAIL = "alexaner.wild@gmail.com";
           window.userRoleCache = null;
 
@@ -96,57 +100,8 @@ jobs:
               } else if (typeof db !== "undefined" && db && typeof curProjectId !== "undefined") {
                 await db.collection("projects").doc(curProjectId).set(proj, { merge: true });
               }
-            } catch(err) {
-              console.error("Persistenz-Fehler:", err);
-            }
+            } catch(err) {}
           }
-
-          // Tab-Routing: Native Tabs sauber öffnen
-          window.openNativeTab = function(tabKey, el) {
-            let pmCockpit = document.getElementById("pmCockpitContainer");
-            let prog = document.getElementById("programmierenContainer");
-            if (pmCockpit) pmCockpit.style.display = "none";
-            if (prog) prog.style.display = "none";
-
-            document.querySelectorAll("aside.side button").forEach(b => b.classList.remove("active"));
-            if (el) el.classList.add("active");
-
-            if (typeof setTab === "function") {
-              setTab(tabKey, el);
-            } else if (typeof showTab === "function") {
-              showTab(tabKey);
-            }
-          };
-
-          // Tab-Routing: PM Tabs öffnen
-          window.openPmTab = function(tabKey, el) {
-            // Alle nativen Views ausblenden
-            document.querySelectorAll("main > div, main > section").forEach(d => {
-              if (d.id !== "pmCockpitContainer" && d.id !== "programmierenContainer") {
-                d.style.display = "none";
-              }
-            });
-
-            document.querySelectorAll("aside.side button").forEach(b => b.classList.remove("active"));
-            if (el) el.classList.add("active");
-
-            let pmCockpit = document.getElementById("pmCockpitContainer");
-            let prog = document.getElementById("programmierenContainer");
-
-            if (tabKey === "pm-cockpit") {
-              if (prog) prog.style.display = "none";
-              if (pmCockpit) {
-                pmCockpit.style.display = "block";
-                renderPmCockpit();
-              }
-            } else if (tabKey === "programmieren") {
-              if (pmCockpit) pmCockpit.style.display = "none";
-              if (prog) {
-                prog.style.display = "block";
-                renderProgrammieren();
-              }
-            }
-          };
 
           window.formatSecs = function(ms) {
             let totalSecs = Math.max(0, Math.floor(ms / 1000));
@@ -187,15 +142,11 @@ jobs:
 
             if (!room.workSessions) {
               room.workSessions = [];
-              if (room.startedAt) {
-                room.workSessions.push({ start: room.startedAt, end: room.completedAt || null });
-              }
+              if (room.startedAt) room.workSessions.push({ start: room.startedAt, end: room.completedAt || null });
             }
 
             let last = room.workSessions[room.workSessions.length - 1];
-            if (!last || last.end) {
-              room.workSessions.push({ start: Date.now(), end: null });
-            }
+            if (!last || last.end) room.workSessions.push({ start: Date.now(), end: null });
 
             room.status = "in_progress";
             if (!room.startedAt) room.startedAt = Date.now();
@@ -257,17 +208,23 @@ jobs:
             return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + btns + '</div>';
           };
 
+          // Sekundentakt für aktive Räume
           setInterval(() => {
             let rooms = getAppRooms();
             rooms.forEach(r => {
               if (isRoomActive(r)) {
                 let badge = document.getElementById("timer-badge-" + r.id);
-                if (badge) {
-                  badge.textContent = "⏱ In Arbeit (" + formatSecs(getRoomTotalDurationMs(r)) + ")";
-                }
+                if (badge) badge.textContent = "⏱ In Arbeit (" + formatSecs(getRoomTotalDurationMs(r)) + ")";
               }
             });
           }, 1000);
+
+          function hidePmViews() {
+            let c1 = document.getElementById("pmCockpitContainer");
+            let c2 = document.getElementById("programmierenContainer");
+            if (c1) c1.style.display = "none";
+            if (c2) c2.style.display = "none";
+          }
 
           window.renderPmCockpit = function() {
             let container = document.getElementById("pmCockpitContainer");
@@ -283,12 +240,10 @@ jobs:
             rooms.forEach(r => {
               let comps = (r.components || []).length || (r.devices || []).length || 0;
               totalComps += comps;
-              let dur = getRoomTotalDurationMs(r);
-              totalMs += dur;
+              totalMs += getRoomTotalDurationMs(r);
 
-              if (isRoomActive(r)) {
-                inP++;
-              } else if (r.status === "completed" || r.completedAt) {
+              if (isRoomActive(r)) inP++;
+              else if (r.status === "completed" || r.completedAt) {
                 done++;
                 installedComps += comps;
               }
@@ -330,7 +285,7 @@ jobs:
                 <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:14px;margin-bottom:16px;">
                   <div style="font-weight:700;margin-bottom:8px;">📦 Komponenten-Status</div>
                   <div style="display:flex;justify-content:space-between;font-size:14px;padding:4px 0;"><span>Gesamt erfasst:</span><b>${totalComps} Stk.</b></div>
-                  <div style="display:flex;justify-content:space-between;font-size:14px;padding:4px 0;color:#16a34a;"><span>Bereits verbaut (in fertigen Räumen):</span><b>${installedComps} Stk.</b></div>
+                  <div style="display:flex;justify-content:space-between;font-size:14px;padding:4px 0;color:#16a34a;"><span>Bereits verbaut:</span><b>${installedComps} Stk.</b></div>
                   <div style="display:flex;justify-content:space-between;font-size:14px;padding:4px 0;color:#ef4444;"><span>Noch zu verbauen:</span><b>${remainingComps} Stk.</b></div>
                 </div>
 
@@ -394,7 +349,7 @@ jobs:
             container.innerHTML = `
               <div style="padding: 16px;">
                 <h2 style="margin-top:0;">💻 Komponenten programmieren (Anlernen)</h2>
-                <p style="color:#64748b;font-size:13px;">Abgleich zwischen den im Gebäude aufgenommenen Komponenten und den vor dem Verbau angelernten Einheiten.</p>
+                <p style="color:#64748b;font-size:13px;">Abgleich zwischen den erfassten Komponenten und den vorab programmierten Einheiten.</p>
                 <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:14px;overflow-x:auto;">
                   <table style="width:100%;border-collapse:collapse;">
                     <thead>
@@ -421,7 +376,38 @@ jobs:
             renderProgrammieren();
           };
 
-          async function checkRoleAndApplyMenu() {
+          // Event Listener an Original-Buttons und PM-Buttons binden
+          function setupMenuListeners() {
+            // Alle Original-Buttons schalten PM-Views wieder aus
+            document.querySelectorAll("aside.side button:not(#btnPmCockpit):not(#btnPmProg)").forEach(btn => {
+              btn.removeEventListener("click", hidePmViews);
+              btn.addEventListener("click", hidePmViews);
+            });
+
+            let btnCockpit = document.getElementById("btnPmCockpit");
+            if (btnCockpit) {
+              btnCockpit.onclick = function() {
+                document.querySelectorAll("main > div, main > section").forEach(d => {
+                  if (d.id !== "pmCockpitContainer") d.style.display = "none";
+                });
+                let c = document.getElementById("pmCockpitContainer");
+                if (c) { c.style.display = "block"; renderPmCockpit(); }
+              };
+            }
+
+            let btnProg = document.getElementById("btnPmProg");
+            if (btnProg) {
+              btnProg.onclick = function() {
+                document.querySelectorAll("main > div, main > section").forEach(d => {
+                  if (d.id !== "programmierenContainer") d.style.display = "none";
+                });
+                let c = document.getElementById("programmierenContainer");
+                if (c) { c.style.display = "block"; renderProgrammieren(); }
+              };
+            }
+          }
+
+          async function checkRole() {
             let em = getCurEmail();
             if (!em) return;
             try {
@@ -432,29 +418,19 @@ jobs:
             } catch(e) {}
 
             let admin = isBoss();
-            document.querySelectorAll(".pm-only").forEach(el => {
-              el.style.display = admin ? "" : "none";
-            });
+            let pmNav = document.getElementById("pmNavGroup");
+            if (pmNav) pmNav.style.display = admin ? "block" : "none";
           }
 
-          if (typeof auth !== "undefined" && auth) {
-            auth.onAuthStateChanged(() => setTimeout(checkRoleAndApplyMenu, 300));
-          }
-          setInterval(checkRoleAndApplyMenu, 2500);
+          window.addEventListener("DOMContentLoaded", () => {
+            setupMenuListeners();
+            setTimeout(checkRole, 500);
+          });
+          setTimeout(setupMenuListeners, 1000);
+          setInterval(checkRole, 3000);
           </script>"""
 
-          # 3. PM Container im Hauptbereich bereitstellen
-          containers = """
-          <div id="pmCockpitContainer" style="display:none;"></div>
-          <div id="programmierenContainer" style="display:none;"></div>
-          """
-          if 'id="pmCockpitContainer"' not in content:
-              content = content.replace("</main>", containers + "\n</main>")
-
-          if 'id="roles-dashboard-system"' in content:
-              content = re.sub(r'<script id="roles-dashboard-system">[\s\S]*?<\/script>', pm_system_script.strip(), content)
-          else:
-              content = content.replace("</body>", pm_system_script.strip() + "\n</body>")
+          content = content.replace("</body>", script_payload + "\n</body>")
 
           with open("index.html", "w", encoding="utf-8") as f:
               f.write(content)
@@ -465,6 +441,6 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Restore native routing and mount PM Views properly" || echo "Keine Aenderung"
+          git commit -m "Restore original native navigation and hook PM safely" || echo "Keine Aenderung"
           git pull --rebase origin main
           git push origin main
