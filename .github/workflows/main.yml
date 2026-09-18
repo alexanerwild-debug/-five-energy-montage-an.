@@ -1,4 +1,4 @@
-name: Permanent Room Header Patch
+name: Multi-Session Time Tracking and Persistent Dashboard
 
 on:
   workflow_dispatch:
@@ -7,78 +7,230 @@ permissions:
   contents: write
 
 jobs:
-  patch-core:
+  patch-sessions:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Insert Status Bar Directly into wfRoomHtml Source
+      - name: Inject Multi-Session Tracking and Live Sync
         run: |
           python3 - << 'EOF'
           with open("index.html", "r", encoding="utf-8") as f:
               content = f.read()
 
-          functions_code = """
-          <script id="room-actions-runtime">
+          script_code = """<script id="roles-dashboard-system">
+          window.SUPER_ADMIN_EMAIL = "alexaner.wild@gmail.com";
+          window.userRoleCache = null;
+
+          function getCurEmail() {
+            try { return (typeof authEmail === "function" && authEmail()) || (currentUser && currentUser.email) || ""; }
+            catch(e) { return ""; }
+          }
+
+          function isBoss() {
+            let em = (getCurEmail() || "").toLowerCase().trim();
+            return em === window.SUPER_ADMIN_EMAIL.toLowerCase().trim() || (window.userRoleCache && window.userRoleCache.role === "admin");
+          }
+
+          function getMyTeam() {
+            if (isBoss()) return null;
+            if (window.userRoleCache && window.userRoleCache.team) return window.userRoleCache.team;
+            let em = getCurEmail();
+            return em ? em.split("@")[0] : null;
+          }
+
+          async function checkRole() {
+            let em = getCurEmail();
+            if (!em) return;
+            try {
+              if (typeof db !== "undefined" && db) {
+                let snap = await db.collection("app_users").doc(em.toLowerCase()).get();
+                if (snap.exists) window.userRoleCache = snap.data();
+              }
+            } catch(err) {}
+
+            let admin = isBoss();
+            document.querySelectorAll("aside.side button[data-tab]").forEach(btn => {
+              let tab = btn.getAttribute("data-tab");
+              if (!admin && (tab === "projekte" || tab === "teams" || tab === "finanzen")) {
+                btn.style.display = "none";
+              } else {
+                btn.style.display = "";
+              }
+            });
+          }
+
+          if (typeof auth !== "undefined" && auth) {
+            auth.onAuthStateChanged(() => setTimeout(checkRole, 300));
+          }
+
+          function getAppRooms() {
+            let r = [];
+            try {
+              let proj = (typeof p === "function") ? p() : null;
+              if (proj) r = proj.rooms || (proj.project && proj.project.rooms) || [];
+              if (!r.length && typeof project !== "undefined" && project) r = project.rooms || [];
+            } catch(e) {}
+            return r;
+          }
+
+          async function saveAppRooms(rooms) {
+            try {
+              if (typeof fsProject === "function") {
+                await fsProject().update({ rooms: rooms });
+              } else if (typeof db !== "undefined" && db && typeof curProjectId !== "undefined") {
+                await db.collection("projects").doc(curProjectId).update({ rooms: rooms });
+              }
+            } catch(e) {
+              console.error("Speichern fehlgeschlagen:", e);
+            }
+          }
+
+          // Session-Hilfsfunktionen
+          window.getRoomTotalDurationMinutes = function(r) {
+            let sessions = r.workSessions || [];
+            let totalMs = 0;
+            let now = Date.now();
+
+            if (!sessions.length && r.startedAt) {
+              totalMs += ((r.completedAt || now) - r.startedAt);
+            } else {
+              sessions.forEach(s => {
+                let start = s.start || 0;
+                let end = s.end || now;
+                if (start > 0 && end >= start) {
+                  totalMs += (end - start);
+                }
+              });
+            }
+            return Math.max(0, Math.round(totalMs / 60000));
+          };
+
+          window.isRoomActive = function(r) {
+            if (r.workSessions && r.workSessions.length > 0) {
+              let last = r.workSessions[r.workSessions.length - 1];
+              return !last.end;
+            }
+            return (r.status === "in_progress" || (r.startedAt && !r.completedAt));
+          };
+
+          // 1. Raum starten (Erst-Start oder Fortsetzen)
           window.startRoomWork = async function(rid) {
-            try {
-              let proj = (typeof p === "function") ? p() : null;
-              let rooms = proj ? (proj.rooms || (proj.project && proj.project.rooms) || []) : [];
-              let room = rooms.find(x => x.id === rid);
-              if (!room) return;
-              room.startedAt = Date.now();
-              room.status = "in_progress";
-              if (typeof fsProject === "function") await fsProject().update({ rooms: rooms });
-              if (typeof render === "function") render();
-              else if (typeof renderWorkflow === "function") renderWorkflow();
-            } catch(e) { console.error(e); }
+            let rooms = getAppRooms();
+            let room = rooms.find(x => x.id === rid);
+            if (!room) return;
+
+            if (!room.workSessions) {
+              room.workSessions = [];
+              if (room.startedAt) {
+                room.workSessions.push({
+                  start: room.startedAt,
+                  end: room.completedAt || null
+                });
+              }
+            }
+
+            let last = room.workSessions[room.workSessions.length - 1];
+            if (!last || last.end) {
+              room.workSessions.push({ start: Date.now(), end: null });
+            }
+
+            room.status = "in_progress";
+            if (!room.startedAt) room.startedAt = Date.now();
+            room.completedAt = null;
+
+            await saveAppRooms(rooms);
+            if (typeof render === "function") render();
+            else if (typeof renderWorkflow === "function") renderWorkflow();
+            refreshLiveCounters();
           };
 
+          // 2. Raum abschließen
           window.finishRoomWork = async function(rid) {
-            try {
-              let proj = (typeof p === "function") ? p() : null;
-              let rooms = proj ? (proj.rooms || (proj.project && proj.project.rooms) || []) : [];
-              let room = rooms.find(x => x.id === rid);
-              if (!room) return;
-              room.completedAt = Date.now();
-              room.status = "completed";
-              if (typeof fsProject === "function") await fsProject().update({ rooms: rooms });
-              if (typeof render === "function") render();
-              else if (typeof renderWorkflow === "function") renderWorkflow();
-            } catch(e) { console.error(e); }
+            let rooms = getAppRooms();
+            let room = rooms.find(x => x.id === rid);
+            if (!room) return;
+
+            let now = Date.now();
+            if (!room.workSessions || !room.workSessions.length) {
+              room.workSessions = [{ start: room.startedAt || now, end: now }];
+            } else {
+              let last = room.workSessions[room.workSessions.length - 1];
+              if (!last.end) last.end = now;
+            }
+
+            room.status = "completed";
+            room.completedAt = now;
+
+            await saveAppRooms(rooms);
+            if (typeof render === "function") render();
+            else if (typeof renderWorkflow === "function") renderWorkflow();
+            refreshLiveCounters();
           };
 
+          // UI-Rendering Snippet fuer jeden Raum
           window.getRoomStatusSnippet = function(r) {
-            let badge = '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;">Offen</span>';
-            if (r.completedAt || r.status === "completed") {
-              badge = '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;">Fertig</span>';
-            } else if (r.startedAt || r.status === "in_progress") {
-              badge = '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;">In Arbeit</span>';
+            let active = isRoomActive(r);
+            let isDone = (r.status === "completed" || (r.completedAt && !active));
+            let totalMins = getRoomTotalDurationMinutes(r);
+            let h = Math.floor(totalMins / 60);
+            let m = totalMins % 60;
+            let timeStr = (h > 0 ? h + "h " : "") + m + "m";
+
+            let badge = '<span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;">Offen</span>';
+            if (isDone) {
+              badge = '<span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;">Fertig (' + timeStr + ')</span>';
+            } else if (active) {
+              badge = '<span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;">In Arbeit (⏱ ' + timeStr + ')</span>';
             }
 
             let btn = "";
-            if (!r.startedAt) {
+            if (!active && !isDone) {
               btn = '<button type="button" class="btn green" style="width:auto;padding:5px 12px;margin:0;font-size:12px;" onclick="event.stopPropagation();startRoomWork(\\'' + r.id + '\\')">▶ Start</button>';
-            } else if (!r.completedAt) {
+            } else if (active) {
               btn = '<button type="button" class="btn green" style="width:auto;padding:5px 12px;margin:0;font-size:12px;background:#10b981;" onclick="event.stopPropagation();finishRoomWork(\\'' + r.id + '\\')">✔ Fertig</button>';
+            } else if (isDone) {
+              btn = '<button type="button" class="btn" style="width:auto;padding:5px 12px;margin:0;font-size:12px;background:#3b82f6;color:#fff;" onclick="event.stopPropagation();startRoomWork(\\'' + r.id + '\\')">↺ Fortsetzen</button>';
             }
+
             return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + btn + '</div>';
           };
-          </script>
-          """
 
-          if 'id="room-actions-runtime"' in content:
-              import re
-              content = re.sub(r'<script id="room-actions-runtime">[\s\S]*?<\/script>', functions_code.strip(), content)
+          // Live-Zaehler fuer Dashboard
+          function refreshLiveCounters() {
+            let rooms = getAppRooms();
+            let total = rooms.length;
+            let comp = 0;
+            let inP = 0;
+
+            rooms.forEach(r => {
+              if (isRoomActive(r)) {
+                inP++;
+              } else if (r.status === "completed" || r.completedAt) {
+                comp++;
+              }
+            });
+
+            let op = total > 0 ? Math.max(0, total - comp - inP) : 0;
+
+            let cO = document.getElementById("countOpen");
+            let cP = document.getElementById("countProgress");
+            let cD = document.getElementById("countDone");
+            if (cO) cO.textContent = op;
+            if (cP) cP.textContent = inP;
+            if (cD) cD.textContent = comp;
+          }
+
+          setInterval(refreshLiveCounters, 1000);
+          </script>"""
+
+          import re
+          if 'id="roles-dashboard-system"' in content:
+              content = re.sub(r'<script id="roles-dashboard-system">[\s\S]*?<\/script>', script_code.strip(), content)
           else:
-              content = content.replace("</head>", functions_code.strip() + "\n</head>")
-
-          old_wfhead = '<div class="wfHead">'
-          new_wfhead = '<div class="wfHead">${typeof getRoomStatusSnippet === "function" ? getRoomStatusSnippet(r) : ""}'
-          if old_wfhead in content and new_wfhead not in content:
-              content = content.replace(old_wfhead, new_wfhead)
+              content = content.replace("</body>", script_code.strip() + "\n</body>")
 
           with open("index.html", "w", encoding="utf-8") as f:
               f.write(content)
@@ -90,5 +242,5 @@ jobs:
           git config user.email "github-actions@github.com"
           git pull --rebase origin main
           git add index.html
-          git commit -m "Permanently insert status snippet into wfRoomHtml template" || echo "Keine Aenderung"
+          git commit -m "Add multi-session room tracking and persistent background sync" || echo "Keine Aenderung"
           git push origin main
