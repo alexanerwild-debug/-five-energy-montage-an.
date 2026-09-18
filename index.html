@@ -777,66 +777,148 @@ if (typeof auth !== "undefined" && auth) {
   auth.onAuthStateChanged(() => setTimeout(checkRole, 300));
 }
 
+function getAppRooms() {
+  let r = [];
+  try {
+    let proj = (typeof p === "function") ? p() : null;
+    if (proj) r = proj.rooms || (proj.project && proj.project.rooms) || [];
+    if (!r.length && typeof project !== "undefined" && project) r = project.rooms || [];
+  } catch(e) {}
+  return r;
+}
+
+async function saveAppRooms(rooms) {
+  try {
+    if (typeof fsProject === "function") {
+      await fsProject().update({ rooms: rooms });
+    } else if (typeof db !== "undefined" && db && typeof curProjectId !== "undefined") {
+      await db.collection("projects").doc(curProjectId).update({ rooms: rooms });
+    }
+  } catch(e) {
+    console.error("Speichern fehlgeschlagen:", e);
+  }
+}
+
+window.getRoomTotalDurationMinutes = function(r) {
+  let sessions = r.workSessions || [];
+  let totalMs = 0;
+  let now = Date.now();
+
+  if (!sessions.length && r.startedAt) {
+    totalMs += ((r.completedAt || now) - r.startedAt);
+  } else {
+    sessions.forEach(s => {
+      let start = s.start || 0;
+      let end = s.end || now;
+      if (start > 0 && end >= start) {
+        totalMs += (end - start);
+      }
+    });
+  }
+  return Math.max(0, Math.round(totalMs / 60000));
+};
+
+window.isRoomActive = function(r) {
+  if (r.workSessions && r.workSessions.length > 0) {
+    let last = r.workSessions[r.workSessions.length - 1];
+    return !last.end;
+  }
+  return (r.status === "in_progress" || (r.startedAt && !r.completedAt));
+};
+
 window.startRoomWork = async function(rid) {
-  let proj = (typeof p === "function") ? p() : null;
-  let rooms = proj ? (proj.rooms || (proj.project && proj.project.rooms) || []) : [];
+  let rooms = getAppRooms();
   let room = rooms.find(x => x.id === rid);
   if (!room) return;
-  room.startedAt = Date.now();
+
+  if (!room.workSessions) {
+    room.workSessions = [];
+    if (room.startedAt) {
+      room.workSessions.push({
+        start: room.startedAt,
+        end: room.completedAt || null
+      });
+    }
+  }
+
+  let last = room.workSessions[room.workSessions.length - 1];
+  if (!last || last.end) {
+    room.workSessions.push({ start: Date.now(), end: null });
+  }
+
   room.status = "in_progress";
-  await fsProject().update({ rooms: rooms });
+  if (!room.startedAt) room.startedAt = Date.now();
+  room.completedAt = null;
+
+  await saveAppRooms(rooms);
   if (typeof render === "function") render();
+  else if (typeof renderWorkflow === "function") renderWorkflow();
+  refreshLiveCounters();
 };
 
 window.finishRoomWork = async function(rid) {
-  let proj = (typeof p === "function") ? p() : null;
-  let rooms = proj ? (proj.rooms || (proj.project && proj.project.rooms) || []) : [];
+  let rooms = getAppRooms();
   let room = rooms.find(x => x.id === rid);
   if (!room) return;
-  room.completedAt = Date.now();
+
+  let now = Date.now();
+  if (!room.workSessions || !room.workSessions.length) {
+    room.workSessions = [{ start: room.startedAt || now, end: now }];
+  } else {
+    let last = room.workSessions[room.workSessions.length - 1];
+    if (!last.end) last.end = now;
+  }
+
   room.status = "completed";
-  await fsProject().update({ rooms: rooms });
+  room.completedAt = now;
+
+  await saveAppRooms(rooms);
   if (typeof render === "function") render();
+  else if (typeof renderWorkflow === "function") renderWorkflow();
+  refreshLiveCounters();
 };
 
-// Patch wfRoomHtml
-if (typeof wfRoomHtml === "function") {
-  const origWf = wfRoomHtml;
-  wfRoomHtml = function(r, mode) {
-    let t = getMyTeam();
-    if (t && r.team && r.team.trim() !== "" && r.team.toLowerCase().trim() !== t.toLowerCase().trim()) return "";
-    let html = origWf(r, mode);
+window.getRoomStatusSnippet = function(r) {
+  let active = isRoomActive(r);
+  let isDone = (r.status === "completed" || (r.completedAt && !active));
+  let totalMins = getRoomTotalDurationMinutes(r);
+  let h = Math.floor(totalMins / 60);
+  let m = totalMins % 60;
+  let timeStr = (h > 0 ? h + "h " : "") + m + "m";
 
-    let badge = "<span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;">Offen</span>";
-    if (r.completedAt || r.status === "completed") {
-      badge = "<span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;">Fertig</span>";
-    } else if (r.startedAt || r.status === "in_progress") {
-      badge = "<span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;">In Arbeit</span>";
-    }
+  let badge = '<span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;">Offen</span>';
+  if (isDone) {
+    badge = '<span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;">Fertig (' + timeStr + ')</span>';
+  } else if (active) {
+    badge = '<span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;">In Arbeit (⏱ ' + timeStr + ')</span>';
+  }
 
-    let btn = "";
-    if (!r.startedAt) {
-      btn = "<button type="button" class="btn green" style="width:auto;padding:6px 14px;margin:0;font-size:12px;" onclick="startRoomWork('" + r.id + "')">▶ Start</button>";
-    } else if (!r.completedAt) {
-      btn = "<button type="button" class="btn green" style="width:auto;padding:6px 14px;margin:0;font-size:12px;background:#10b981;" onclick="finishRoomWork('" + r.id + "')">✔ Fertig</button>";
-    }
+  let btn = "";
+  if (!active && !isDone) {
+    btn = '<button type="button" class="btn green" style="width:auto;padding:5px 12px;margin:0;font-size:12px;" onclick="event.stopPropagation();startRoomWork(\'' + r.id + '\')">▶ Start</button>';
+  } else if (active) {
+    btn = '<button type="button" class="btn green" style="width:auto;padding:5px 12px;margin:0;font-size:12px;background:#10b981;" onclick="event.stopPropagation();finishRoomWork(\'' + r.id + '\')">✔ Fertig</button>';
+  } else if (isDone) {
+    btn = '<button type="button" class="btn" style="width:auto;padding:5px 12px;margin:0;font-size:12px;background:#3b82f6;color:#fff;" onclick="event.stopPropagation();startRoomWork(\'' + r.id + '\')">↺ Fortsetzen</button>';
+  }
 
-    let controlRow = "<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;margin:6px 0;border-bottom:1px solid #e2e8f0;">" + badge + btn + "</div>";
-    return html.replace(/<div class="wfHead">${typeof getRoomStatusSnippet === "function" ? getRoomStatusSnippet(r) : ""}/, "<div class="wfHead">${typeof getRoomStatusSnippet === "function" ? getRoomStatusSnippet(r) : ""}" + controlRow);
-  };
-}
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + btn + '</div>';
+};
 
 function refreshLiveCounters() {
-  let rooms = [];
-  try {
-    let proj = (typeof p === "function") ? p() : null;
-    if (proj) rooms = proj.rooms || (proj.project && proj.project.rooms) || [];
-    if (!rooms.length && typeof project !== "undefined" && project) rooms = project.rooms || [];
-  } catch(e) {}
-
+  let rooms = getAppRooms();
   let total = rooms.length;
-  let comp = rooms.filter(r => r.completedAt || r.status === "completed").length;
-  let inP = rooms.filter(r => (r.startedAt && !r.completedAt) || r.status === "in_progress").length;
+  let comp = 0;
+  let inP = 0;
+
+  rooms.forEach(r => {
+    if (isRoomActive(r)) {
+      inP++;
+    } else if (r.status === "completed" || r.completedAt) {
+      comp++;
+    }
+  });
+
   let op = total > 0 ? Math.max(0, total - comp - inP) : 0;
 
   let cO = document.getElementById("countOpen");
