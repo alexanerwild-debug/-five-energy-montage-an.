@@ -724,17 +724,20 @@ function getAppRooms() {
   return proj.rooms || (proj.project && proj.project.rooms) || [];
 }
 
-async function persistData() {
+// Sicherer Speicherpfad: Nur die Raeume partiell updaten, damit kein Datenverlust entsteht
+async function persistRoomsOnly() {
   try {
-    let proj = getAppProject();
+    let rooms = getAppRooms();
     if (typeof fsProject === "function") {
-      await fsProject().set(proj, { merge: true });
+      await fsProject().update({ rooms: rooms });
+    } else if (typeof db !== "undefined" && db && typeof curProjectId !== "undefined") {
+      await db.collection("projects").doc(curProjectId).update({ rooms: rooms });
     } else if (typeof save === "function") {
       await save();
-    } else if (typeof db !== "undefined" && db && typeof curProjectId !== "undefined") {
-      await db.collection("projects").doc(curProjectId).set(proj, { merge: true });
     }
-  } catch(err) {}
+  } catch(err) {
+    console.error("Fehler beim Speichern der Raeume:", err);
+  }
 }
 
 window.formatSecs = function(ms) {
@@ -769,6 +772,7 @@ window.isRoomActive = function(r) {
   return (r.status === "in_progress" || (r.startedAt && !r.completedAt));
 };
 
+// 1. Basis-Ablauf: Start
 window.startRoomWork = async function(rid) {
   let rooms = getAppRooms();
   let room = rooms.find(x => x.id === rid);
@@ -776,21 +780,22 @@ window.startRoomWork = async function(rid) {
 
   if (!room.workSessions) {
     room.workSessions = [];
-    if (room.startedAt) room.workSessions.push({ start: room.startedAt, end: room.completedAt || null });
   }
-
   let last = room.workSessions[room.workSessions.length - 1];
-  if (!last || last.end) room.workSessions.push({ start: Date.now(), end: null });
+  if (!last || last.end) {
+    room.workSessions.push({ start: Date.now(), end: null });
+  }
 
   room.status = "in_progress";
   if (!room.startedAt) room.startedAt = Date.now();
   room.completedAt = null;
 
-  await persistData();
+  await persistRoomsOnly();
   if (typeof renderWorkflow === "function") renderWorkflow();
   else if (typeof render === "function") render();
 };
 
+// 2. Basis-Ablauf: Fertigstellen (mit Sperre bei offener Klaerung)
 window.finishRoomWork = async function(rid) {
   let rooms = getAppRooms();
   let room = rooms.find(x => x.id === rid);
@@ -812,16 +817,56 @@ window.finishRoomWork = async function(rid) {
   room.status = "completed";
   room.completedAt = now;
 
-  await persistData();
+  await persistRoomsOnly();
   if (typeof renderWorkflow === "function") renderWorkflow();
   else if (typeof render === "function") render();
 };
 
+// 3. Zusaetzlicher Arbeitsabschnitt: Neuer Button
+window.addExtraSession = async function(rid) {
+  let rooms = getAppRooms();
+  let room = rooms.find(x => x.id === rid);
+  if (!room) return;
+
+  if (!room.workSessions) {
+    room.workSessions = [];
+    if (room.startedAt) {
+      room.workSessions.push({ start: room.startedAt, end: room.completedAt || Date.now() });
+    }
+  }
+
+  room.workSessions.push({ start: Date.now(), end: null });
+  room.status = "in_progress";
+
+  await persistRoomsOnly();
+  if (typeof renderWorkflow === "function") renderWorkflow();
+  else if (typeof render === "function") render();
+};
+
+// 4. Zusaetzlichen Arbeitsabschnitt wieder stoppen
+window.stopExtraSession = async function(rid) {
+  let rooms = getAppRooms();
+  let room = rooms.find(x => x.id === rid);
+  if (!room) return;
+
+  let now = Date.now();
+  if (room.workSessions && room.workSessions.length > 0) {
+    let last = room.workSessions[room.workSessions.length - 1];
+    if (!last.end) last.end = now;
+  }
+
+  await persistRoomsOnly();
+  if (typeof renderWorkflow === "function") renderWorkflow();
+  else if (typeof render === "function") render();
+};
+
+// UI-Rendering Snippet fuer jeden Raum mit 2 getrennten Buttons
 window.getRoomStatusSnippet = function(r) {
   let active = isRoomActive(r);
   let isDone = (r.status === "completed" || (r.completedAt && !active));
   let totalMs = getRoomTotalDurationMs(r);
   let timeStr = formatSecs(totalMs);
+  let sessCount = (r.workSessions || []).length;
 
   let badge = '<span style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;">Offen</span>';
   if (isDone) {
@@ -830,19 +875,28 @@ window.getRoomStatusSnippet = function(r) {
     badge = '<span id="timer-badge-' + r.id + '" style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;">⏱ In Arbeit (' + timeStr + ')</span>';
   }
 
-  let btns = "";
+  // Button 1: Alter Button bleibt unberuehrt
+  let btn1 = "";
   if (!active && !isDone) {
-    btns = '<button type="button" class="btn green" style="width:auto;padding:6px 14px;margin:0;font-size:12px;" onclick="event.stopPropagation();startRoomWork(\'' + r.id + '\')">▶ Start</button>';
-  } else if (active) {
-    btns = '<button type="button" class="btn green" style="width:auto;padding:6px 14px;margin:0;font-size:12px;background:#10b981;" onclick="event.stopPropagation();finishRoomWork(\'' + r.id + '\')">✔ Fertig</button>';
-  } else if (isDone) {
-    btns = '<button type="button" class="btn" style="width:auto;padding:6px 14px;margin:0;font-size:12px;background:#3b82f6;color:#fff;" onclick="event.stopPropagation();startRoomWork(\'' + r.id + '\')">✏️ Weiterbearbeiten</button>';
+    btn1 = '<button type="button" class="btn green" style="width:auto;padding:6px 12px;margin:0;font-size:12px;" onclick="event.stopPropagation();startRoomWork(\'' + r.id + '\')">▶ Start</button>';
+  } else if (active && !r.completedAt) {
+    btn1 = '<button type="button" class="btn green" style="width:auto;padding:6px 12px;margin:0;font-size:12px;background:#10b981;" onclick="event.stopPropagation();finishRoomWork(\'' + r.id + '\')">✔ Fertig</button>';
+  } else {
+    btn1 = '<button type="button" class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:12px;background:#e2e8f0;color:#64748b;cursor:default;" disabled>✔ Abgeschlossen</button>';
   }
 
-  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + btns + '</div>';
+  // Button 2: Zusaetzlicher Button daneben fuer weitere Arbeitssitzungen
+  let btn2 = "";
+  if (isDone) {
+    btn2 = '<button type="button" class="btn" style="width:auto;padding:6px 12px;margin-left:6px;font-size:12px;background:#3b82f6;color:#fff;" onclick="event.stopPropagation();addExtraSession(\'' + r.id + '\')">➕ Nacharbeit / Session ' + (sessCount + 1) + '</button>';
+  } else if (active && r.completedAt) {
+    btn2 = '<button type="button" class="btn" style="width:auto;padding:6px 12px;margin-left:6px;font-size:12px;background:#f59e0b;color:#fff;" onclick="event.stopPropagation();stopExtraSession(\'' + r.id + '\')">⏹ Session beenden</button>';
+  }
+
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + '<div style="display:flex;align-items:center;">' + btn1 + btn2 + '</div></div>';
 };
 
-// Sekundentakt für aktive Räume
+// Live Sekundentakt
 setInterval(() => {
   let rooms = getAppRooms();
   rooms.forEach(r => {
@@ -1006,13 +1060,15 @@ window.updateProgrammedCount = async function(compName, val) {
   if (!proj) return;
   if (!proj.programmedComponents) proj.programmedComponents = {};
   proj.programmedComponents[compName] = parseInt(val, 10) || 0;
-  await persistData();
+  try {
+    if (typeof fsProject === "function") {
+      await fsProject().update({ programmedComponents: proj.programmedComponents });
+    }
+  } catch(e){}
   renderProgrammieren();
 };
 
-// Event Listener an Original-Buttons und PM-Buttons binden
 function setupMenuListeners() {
-  // Alle Original-Buttons schalten PM-Views wieder aus
   document.querySelectorAll("aside.side button:not(#btnPmCockpit):not(#btnPmProg)").forEach(btn => {
     btn.removeEventListener("click", hidePmViews);
     btn.addEventListener("click", hidePmViews);
