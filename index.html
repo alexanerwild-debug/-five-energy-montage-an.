@@ -129,12 +129,38 @@ window.getRoomStatusSnippet = function(r) {
 </div>
 <header><div class="brand">FIV.Energy</div><div class="sub">Montage & Fotodokumentation</div></header>
 <div class="projectbar"><select id="projectSelect"></select><button class="btn green" style="width:auto;margin:0;padding:11px" onclick="newProject()">+ Projekt</button></div>
-<button class="mobileMenu" onclick="document.querySelector('.side').classList.toggle('open')">☰</button><div class="appShell"><aside class="side"><div class="navTitle" style="padding:10px 0;">
-  <select id="companyModeSelect" onchange="window.switchCompanyMode && window.switchCompanyMode(this.value)" style="width:100%; padding:8px; border-radius:6px; background:#1b2430; color:#fff; font-weight:bold; border:1px solid #4a5568; font-size:14px;">
-    <option value="five-energy">⚡ FIV.Energy</option>
-    <option value="macbright">💡 Macbright (Licht)</option>
-  </select>
-</div><button data-tab="dashboard" class="active">🏠 Übersicht</button><button data-tab="projekte">📁 Projekte & Archiv</button><button data-tab="bestand">▤ 📝 Aufnahme Räume</button><button data-tab="plaene">⌑ 🗺️ Pläne</button><button data-tab="montage">🔧 Montage</button><button data-tab="hauptkomponenten">▦ ⚡ Hauptkomponenten</button><button data-tab="teams">👥 Teams</button><div class="navTitle">Wissen & Vorbereitung</div><button data-tab="komponenten">📦 Komponenten</button><button data-tab="arbeitsvorbereitung">🧰 Arbeitsvorbereitung</button><button data-tab="hilfe">▢ 📖 Montageanleitungen</button></aside><main>
+<button class="mobileMenu" onclick="document.querySelector('.side').classList.toggle('open')">☰</button><div class="appShell"><aside class="side">
+  <div style="font-weight:800;font-size:16px;padding:12px;background:#1e293b;color:#fff;border-radius:6px;margin-bottom:12px;display:flex;align-items:center;gap:8px;">
+    ⚡ FIV.Energy
+  </div>
+
+  <!-- PROJEKTLEITER BEREICH (nur fuer Admin) -->
+  <div class="pm-only" style="margin-bottom: 12px;">
+    <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 8px;text-transform:uppercase;letter-spacing:0.5px;">Projektleiter</div>
+    <button type="button" data-tab="pm-cockpit" onclick="switchAppTab('pm-cockpit')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">📊 Projektleiter-Cockpit</button>
+    <button type="button" data-tab="programmieren" onclick="switchAppTab('programmieren')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">💻 Programmieren</button>
+    <button type="button" data-tab="projekte" onclick="switchAppTab('projekte')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">📁 Projekte & Archiv</button>
+    <button type="button" data-tab="teams" onclick="switchAppTab('teams')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">👥 Teams</button>
+  </div>
+
+  <!-- ABWICKLUNG -->
+  <div style="margin-bottom: 12px;">
+    <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 8px;text-transform:uppercase;letter-spacing:0.5px;">Abwicklung / Baustelle</div>
+    <button type="button" data-tab="overview" onclick="switchAppTab('overview')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">🏠 Übersicht</button>
+    <button type="button" data-tab="aufnahme" onclick="switchAppTab('aufnahme')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">📝 Aufnahme Räume</button>
+    <button type="button" data-tab="montage" onclick="switchAppTab('montage')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">🔧 Montage</button>
+    <button type="button" data-tab="plaene" onclick="switchAppTab('plaene')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">🗺️ Pläne</button>
+  </div>
+
+  <!-- WISSEN & VORBEREITUNG -->
+  <div style="margin-bottom: 12px;">
+    <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 8px;text-transform:uppercase;letter-spacing:0.5px;">Wissen & Vorbereitung</div>
+    <button type="button" data-tab="komponenten" onclick="switchAppTab('komponenten')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">📦 Komponenten</button>
+    <button type="button" data-tab="anlernprozess" onclick="switchAppTab('anlernprozess')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">🔄 Anlernprozess</button>
+    <button type="button" data-tab="arbeitsvorbereitung" onclick="switchAppTab('arbeitsvorbereitung')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">🧰 Arbeitsvorbereitung</button>
+    <button type="button" data-tab="montageanleitungen" onclick="switchAppTab('montageanleitungen')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">📖 Montageanleitungen</button>
+  </div>
+</aside><main>
 <section id="dashboard" class="section active"><h1 id="dashTitle">Dashboard</h1><div class="grid" id="stats"></div>
 <div id="adminStatusBoard" style="margin: 16px 0; padding: 16px; background: #f8fafc; border-radius: 10px; border: 1px solid #cbd5e1;">
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -209,6 +235,10 @@ window.getRoomStatusSnippet = function(r) {
 <details class="card helpCard"><summary>CO₂-Melder / weitere Komponenten</summary><ul><li>Montageort nach Projektvorgabe festlegen und Vorher-Foto aufnehmen.</li><li>Nicht unmittelbar in Zugluft, hinter Möbeln oder an ungeeigneten Wärme-/Kältequellen montieren.</li><li>Gerät gerade und fest montieren; Stromversorgung/Batterien gemäß konkretem Modell prüfen.</li><li>Nach Inbetriebnahme Funktion prüfen und Nachher-Foto dokumentieren.</li></ul></details>
 </section>
 <section id="projekte" class="section"><h1>Projekte</h1><div class="card"><h2>Aktives Projekt</h2><div id="projectInfo"></div><div class="topActions"><button class="btn green" onclick="renameProject()">Projekt umbenennen</button><button class="btn amber" onclick="archiveCurrent()">Abschließen & archivieren</button></div></div><div class="card"><h2>Archiv</h2><div id="archiveList"></div></div></section>
+
+<div id="pmCockpitContainer" style="display:none;"></div>
+<div id="programmierenContainer" style="display:none;"></div>
+
 </main></div>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script><script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <script>
@@ -752,70 +782,57 @@ function getMyTeam() {
   return em ? em.split("@")[0] : null;
 }
 
-async function checkRole() {
-  let em = getCurEmail();
-  if (!em) return;
+function getAppProject() {
   try {
-    if (typeof db !== "undefined" && db) {
-      let snap = await db.collection("app_users").doc(em.toLowerCase()).get();
-      if (snap.exists) window.userRoleCache = snap.data();
-    }
-  } catch(err) {}
-
-  let admin = isBoss();
-  document.querySelectorAll("aside.side button[data-tab]").forEach(btn => {
-    let tab = btn.getAttribute("data-tab");
-    if (!admin && (tab === "projekte" || tab === "teams" || tab === "finanzen")) {
-      btn.style.display = "none";
-    } else {
-      btn.style.display = "";
-    }
-  });
-}
-
-if (typeof auth !== "undefined" && auth) {
-  auth.onAuthStateChanged(() => setTimeout(checkRole, 300));
+    if (typeof p === "function") return p();
+    if (typeof project !== "undefined" && project) return project;
+  } catch(e) {}
+  return null;
 }
 
 function getAppRooms() {
-  let r = [];
-  try {
-    let proj = (typeof p === "function") ? p() : null;
-    if (proj) r = proj.rooms || (proj.project && proj.project.rooms) || [];
-    if (!r.length && typeof project !== "undefined" && project) r = project.rooms || [];
-  } catch(e) {}
-  return r;
+  let proj = getAppProject();
+  if (!proj) return [];
+  return proj.rooms || (proj.project && proj.project.rooms) || [];
 }
 
-async function saveAppRooms(rooms) {
+async function persistData() {
   try {
+    let proj = getAppProject();
     if (typeof fsProject === "function") {
-      await fsProject().update({ rooms: rooms });
+      await fsProject().set(proj, { merge: true });
+    } else if (typeof save === "function") {
+      await save();
     } else if (typeof db !== "undefined" && db && typeof curProjectId !== "undefined") {
-      await db.collection("projects").doc(curProjectId).update({ rooms: rooms });
+      await db.collection("projects").doc(curProjectId).set(proj, { merge: true });
     }
-  } catch(e) {
-    console.error("Speichern fehlgeschlagen:", e);
+  } catch(err) {
+    console.error("Persistenz-Fehler:", err);
   }
 }
 
-window.getRoomTotalDurationMinutes = function(r) {
-  let sessions = r.workSessions || [];
-  let totalMs = 0;
-  let now = Date.now();
+window.formatSecs = function(ms) {
+  let totalSecs = Math.max(0, Math.floor(ms / 1000));
+  let h = Math.floor(totalSecs / 3600);
+  let m = Math.floor((totalSecs % 3600) / 60);
+  let s = totalSecs % 60;
+  return (h < 10 ? "0" + h : h) + ":" + (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
+};
 
+window.getRoomTotalDurationMs = function(r) {
+  let sessions = r.workSessions || [];
+  let total = 0;
+  let now = Date.now();
   if (!sessions.length && r.startedAt) {
-    totalMs += ((r.completedAt || now) - r.startedAt);
+    total += ((r.completedAt || now) - r.startedAt);
   } else {
     sessions.forEach(s => {
       let start = s.start || 0;
       let end = s.end || now;
-      if (start > 0 && end >= start) {
-        totalMs += (end - start);
-      }
+      if (start > 0 && end >= start) total += (end - start);
     });
   }
-  return Math.max(0, Math.round(totalMs / 60000));
+  return total;
 };
 
 window.isRoomActive = function(r) {
@@ -834,10 +851,7 @@ window.startRoomWork = async function(rid) {
   if (!room.workSessions) {
     room.workSessions = [];
     if (room.startedAt) {
-      room.workSessions.push({
-        start: room.startedAt,
-        end: room.completedAt || null
-      });
+      room.workSessions.push({ start: room.startedAt, end: room.completedAt || null });
     }
   }
 
@@ -850,16 +864,20 @@ window.startRoomWork = async function(rid) {
   if (!room.startedAt) room.startedAt = Date.now();
   room.completedAt = null;
 
-  await saveAppRooms(rooms);
-  if (typeof render === "function") render();
-  else if (typeof renderWorkflow === "function") renderWorkflow();
-  refreshLiveCounters();
+  await persistData();
+  if (typeof renderWorkflow === "function") renderWorkflow();
+  else if (typeof render === "function") render();
 };
 
 window.finishRoomWork = async function(rid) {
   let rooms = getAppRooms();
   let room = rooms.find(x => x.id === rid);
   if (!room) return;
+
+  if (room.needsClarification && !room.clarificationResolved) {
+    alert("⚠️ Dieser Raum kann nicht abgeschlossen werden: Es ist noch eine offene Klärung vorhanden!");
+    return;
+  }
 
   let now = Date.now();
   if (!room.workSessions || !room.workSessions.length) {
@@ -872,64 +890,240 @@ window.finishRoomWork = async function(rid) {
   room.status = "completed";
   room.completedAt = now;
 
-  await saveAppRooms(rooms);
-  if (typeof render === "function") render();
-  else if (typeof renderWorkflow === "function") renderWorkflow();
-  refreshLiveCounters();
+  await persistData();
+  if (typeof renderWorkflow === "function") renderWorkflow();
+  else if (typeof render === "function") render();
 };
 
 window.getRoomStatusSnippet = function(r) {
   let active = isRoomActive(r);
   let isDone = (r.status === "completed" || (r.completedAt && !active));
-  let totalMins = getRoomTotalDurationMinutes(r);
-  let h = Math.floor(totalMins / 60);
-  let m = totalMins % 60;
-  let timeStr = (h > 0 ? h + "h " : "") + m + "m";
+  let totalMs = getRoomTotalDurationMs(r);
+  let timeStr = formatSecs(totalMs);
 
-  let badge = '<span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;">Offen</span>';
+  let badge = '<span style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;">Offen</span>';
   if (isDone) {
-    badge = '<span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;">Fertig (' + timeStr + ')</span>';
+    badge = '<span style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;">✔ Abgeschlossen (' + timeStr + ')</span>';
   } else if (active) {
-    badge = '<span style="display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;">In Arbeit (⏱ ' + timeStr + ')</span>';
+    badge = '<span id="timer-badge-' + r.id + '" style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;">⏱ In Arbeit (' + timeStr + ')</span>';
   }
 
-  let btn = "";
+  let btns = "";
   if (!active && !isDone) {
-    btn = '<button type="button" class="btn green" style="width:auto;padding:5px 12px;margin:0;font-size:12px;" onclick="event.stopPropagation();startRoomWork(\'' + r.id + '\')">▶ Start</button>';
+    btns = '<button type="button" class="btn green" style="width:auto;padding:6px 14px;margin:0;font-size:12px;" onclick="event.stopPropagation();startRoomWork(\'' + r.id + '\')">▶ Start</button>';
   } else if (active) {
-    btn = '<button type="button" class="btn green" style="width:auto;padding:5px 12px;margin:0;font-size:12px;background:#10b981;" onclick="event.stopPropagation();finishRoomWork(\'' + r.id + '\')">✔ Fertig</button>';
+    btns = '<button type="button" class="btn green" style="width:auto;padding:6px 14px;margin:0;font-size:12px;background:#10b981;" onclick="event.stopPropagation();finishRoomWork(\'' + r.id + '\')">✔ Fertig</button>';
   } else if (isDone) {
-    btn = '<button type="button" class="btn" style="width:auto;padding:5px 12px;margin:0;font-size:12px;background:#3b82f6;color:#fff;" onclick="event.stopPropagation();startRoomWork(\'' + r.id + '\')">↺ Fortsetzen</button>';
+    btns = '<button type="button" class="btn" style="width:auto;padding:6px 14px;margin:0;font-size:12px;background:#3b82f6;color:#fff;" onclick="event.stopPropagation();startRoomWork(\'' + r.id + '\')">✏️ Weiterbearbeiten</button>';
   }
 
-  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + btn + '</div>';
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + btns + '</div>';
 };
 
-function refreshLiveCounters() {
+setInterval(() => {
+  let rooms = getAppRooms();
+  rooms.forEach(r => {
+    if (isRoomActive(r)) {
+      let badge = document.getElementById("timer-badge-" + r.id);
+      if (badge) {
+        badge.textContent = "⏱ In Arbeit (" + formatSecs(getRoomTotalDurationMs(r)) + ")";
+      }
+    }
+  });
+}, 1000);
+
+window.renderPmCockpit = function() {
+  let container = document.getElementById("pmCockpitContainer");
+  if (!container) return;
   let rooms = getAppRooms();
   let total = rooms.length;
-  let comp = 0;
+  let done = 0;
   let inP = 0;
+  let totalMs = 0;
+  let totalComps = 0;
+  let installedComps = 0;
 
   rooms.forEach(r => {
+    let comps = (r.components || []).length || (r.devices || []).length || 0;
+    totalComps += comps;
+    let dur = getRoomTotalDurationMs(r);
+    totalMs += dur;
+
     if (isRoomActive(r)) {
       inP++;
     } else if (r.status === "completed" || r.completedAt) {
-      comp++;
+      done++;
+      installedComps += comps;
     }
   });
 
-  let op = total > 0 ? Math.max(0, total - comp - inP) : 0;
+  let open = Math.max(0, total - done - inP);
+  let remainingComps = Math.max(0, totalComps - installedComps);
 
-  let cO = document.getElementById("countOpen");
-  let cP = document.getElementById("countProgress");
-  let cD = document.getElementById("countDone");
-  if (cO) cO.textContent = op;
-  if (cP) cP.textContent = inP;
-  if (cD) cD.textContent = comp;
+  let rows = rooms.map(r => {
+    let rActive = isRoomActive(r);
+    let rDone = (r.status === "completed" || (r.completedAt && !rActive));
+    let statusLabel = rDone ? '<span style="color:#16a34a;font-weight:700;">Fertig</span>' : (rActive ? '<span style="color:#d97706;font-weight:700;">In Arbeit</span>' : '<span style="color:#ef4444;font-weight:700;">Offen</span>');
+    let comps = (r.components || []).length || (r.devices || []).length || 0;
+    return '<tr style="border-bottom:1px solid #e2e8f0;font-size:13px;"><td style="padding:8px 4px;font-weight:600;">' + (r.name || r.id) + '</td><td style="padding:8px 4px;">' + (r.team || "-") + '</td><td style="padding:8px 4px;">' + statusLabel + '</td><td style="padding:8px 4px;text-align:center;">' + comps + '</td><td style="padding:8px 4px;text-align:right;">' + formatSecs(getRoomTotalDurationMs(r)) + '</td></tr>';
+  }).join("");
+
+  container.innerHTML = `
+    <div style="padding: 16px;">
+      <h2 style="margin-top:0;">📊 Projektleiter-Cockpit</h2>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;">
+        <div style="background:#f8fafc;border:1px solid #cbd5e1;padding:12px;border-radius:8px;text-align:center;">
+          <div style="font-size:12px;color:#64748b;font-weight:600;">GESAMTARBEITSZEIT</div>
+          <b style="font-size:20px;color:#0f172a;">${formatSecs(totalMs)}</b>
+        </div>
+        <div style="background:#fee2e2;color:#ef4444;padding:12px;border-radius:8px;text-align:center;">
+          <div style="font-size:12px;font-weight:600;">OFFENE RÄUME</div>
+          <b style="font-size:20px;">${open}</b>
+        </div>
+        <div style="background:#fef3c7;color:#d97706;padding:12px;border-radius:8px;text-align:center;">
+          <div style="font-size:12px;font-weight:600;">IN ARBEIT</div>
+          <b style="font-size:20px;">${inP}</b>
+        </div>
+        <div style="background:#dcfce7;color:#16a34a;padding:12px;border-radius:8px;text-align:center;">
+          <div style="font-size:12px;font-weight:600;">FERTIG</div>
+          <b style="font-size:20px;">${done} / ${total}</b>
+        </div>
+      </div>
+
+      <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:14px;margin-bottom:16px;">
+        <div style="font-weight:700;margin-bottom:8px;">📦 Komponenten-Status</div>
+        <div style="display:flex;justify-content:space-between;font-size:14px;padding:4px 0;"><span>Gesamt erfasst:</span><b>${totalComps} Stk.</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:14px;padding:4px 0;color:#16a34a;"><span>Bereits verbaut (in fertigen Räumen):</span><b>${installedComps} Stk.</b></div>
+        <div style="display:flex;justify-content:space-between;font-size:14px;padding:4px 0;color:#ef4444;"><span>Noch zu verbauen:</span><b>${remainingComps} Stk.</b></div>
+      </div>
+
+      <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:14px;overflow-x:auto;">
+        <div style="font-weight:700;margin-bottom:8px;">📋 Raumübersicht & Montagezeiten</div>
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:2px solid #cbd5e1;font-size:12px;color:#64748b;text-align:left;">
+              <th style="padding:6px 4px;">Raum</th>
+              <th style="padding:6px 4px;">Team</th>
+              <th style="padding:6px 4px;">Status</th>
+              <th style="padding:6px 4px;text-align:center;">Komp.</th>
+              <th style="padding:6px 4px;text-align:right;">Zeit</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+};
+
+window.renderProgrammieren = function() {
+  let container = document.getElementById("programmierenContainer");
+  if (!container) return;
+  let proj = getAppProject();
+  let programmed = (proj && proj.programmedComponents) || {};
+
+  let rooms = getAppRooms();
+  let compCounts = {};
+  rooms.forEach(r => {
+    let comps = (r.components || []).concat(r.devices || []);
+    comps.forEach(c => {
+      let name = c.name || c.type || "Standard-Komponente";
+      compCounts[name] = (compCounts[name] || 0) + 1;
+    });
+  });
+
+  let keys = Object.keys(compCounts);
+  let rows = "";
+  if (!keys.length) {
+    rows = '<tr><td colspan="4" style="padding:12px;text-align:center;color:#64748b;">Noch keine Komponenten in den Räumen erfasst.</td></tr>';
+  } else {
+    rows = keys.map(k => {
+      let required = compCounts[k];
+      let doneCount = programmed[k] || 0;
+      let diff = required - doneCount;
+      return `
+        <tr style="border-bottom:1px solid #e2e8f0;font-size:13px;">
+          <td style="padding:10px 6px;font-weight:600;">${k}</td>
+          <td style="padding:10px 6px;text-align:center;">${required}</td>
+          <td style="padding:10px 6px;text-align:center;">
+            <input type="number" min="0" value="${doneCount}" style="width:60px;padding:4px;text-align:center;border:1px solid #cbd5e1;border-radius:4px;" onchange="updateProgrammedCount('${k}', this.value)" />
+          </td>
+          <td style="padding:10px 6px;text-align:right;font-weight:700;color:${diff <= 0 ? '#16a34a' : '#ef4444'};">${diff <= 0 ? '✔ Abgeschlossen' : 'Noch ' + diff + ' nötig'}</td>
+        </tr>
+      `;
+    }).join("");
+  }
+
+  container.innerHTML = `
+    <div style="padding: 16px;">
+      <h2 style="margin-top:0;">💻 Komponenten programmieren (Anlernen)</h2>
+      <p style="color:#64748b;font-size:13px;">Abgleich zwischen den im Gebäude aufgenommenen Komponenten und den vor dem Verbau angelernten Einheiten.</p>
+      <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:14px;overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr style="border-bottom:2px solid #cbd5e1;font-size:12px;color:#64748b;text-align:left;">
+              <th style="padding:6px 6px;">Komponente</th>
+              <th style="padding:6px 6px;text-align:center;">Bedarf</th>
+              <th style="padding:6px 6px;text-align:center;">Angelernt</th>
+              <th style="padding:6px 6px;text-align:right;">Status</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>
+    </div>
+  `;
+};
+
+window.updateProgrammedCount = async function(compName, val) {
+  let proj = getAppProject();
+  if (!proj) return;
+  if (!proj.programmedComponents) proj.programmedComponents = {};
+  proj.programmedComponents[compName] = parseInt(val, 10) || 0;
+  await persistData();
+  renderProgrammieren();
+};
+
+window.switchAppTab = function(tabName) {
+  document.querySelectorAll("main > section, .tab-content, #pmCockpitContainer, #programmierenContainer").forEach(el => el.style.display = "none");
+  document.querySelectorAll("aside.side button[data-tab]").forEach(b => b.classList.remove("active"));
+
+  let activeBtn = document.querySelector('aside.side button[data-tab="' + tabName + '"]');
+  if (activeBtn) activeBtn.classList.add("active");
+
+  if (tabName === "pm-cockpit") {
+    let c = document.getElementById("pmCockpitContainer");
+    if (c) { c.style.display = "block"; renderPmCockpit(); }
+  } else if (tabName === "programmieren") {
+    let c = document.getElementById("programmierenContainer");
+    if (c) { c.style.display = "block"; renderProgrammieren(); }
+  } else {
+    let target = document.getElementById(tabName) || document.querySelector('[data-view="' + tabName + '"]');
+    if (target) target.style.display = "block";
+    if (typeof showTab === "function") showTab(tabName);
+  }
+};
+
+async function checkRoleAndApplyMenu() {
+  let em = getCurEmail();
+  if (!em) return;
+  try {
+    if (typeof db !== "undefined" && db) {
+      let snap = await db.collection("app_users").doc(em.toLowerCase()).get();
+      if (snap.exists) window.userRoleCache = snap.data();
+    }
+  } catch(e) {}
+
+  let admin = isBoss();
+  document.querySelectorAll(".pm-only").forEach(el => {
+    el.style.display = admin ? "" : "none";
+  });
 }
 
-setInterval(refreshLiveCounters, 1000);
+if (typeof auth !== "undefined" && auth) {
+  auth.onAuthStateChanged(() => setTimeout(checkRoleAndApplyMenu, 300));
+}
+setInterval(checkRoleAndApplyMenu, 2500);
 </script>
 </body>
 </html>
