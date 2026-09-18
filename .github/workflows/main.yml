@@ -1,4 +1,4 @@
-name: Fix Dashboard Data Extraction
+name: Solid Dashboard and Room Status Patch
 
 on:
   workflow_dispatch:
@@ -7,49 +7,75 @@ permissions:
   contents: write
 
 jobs:
-  fix-dash:
+  patch-solid:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Patch Dashboard Data Access
+      - name: Verankere Status-Board im HTML und update Raum-Rendering
         run: |
           python3 -c '
           with open("index.html", "r", encoding="utf-8") as f:
               content = f.read()
 
-          script = """<script id="roles-dashboard-system">
+          # 1. Status-Kasten direkt fest in das Dashboard-HTML einbetten
+          board_html = """<div id="adminStatusBoard" style="margin: 16px 0; padding: 16px; background: #f8fafc; border-radius: 10px; border: 1px solid #cbd5e1;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <b style="color: #1e293b; font-size: 15px;">📊 Status-Übersicht Montage</b>
+              <span style="font-size: 12px; color: #64748b;">Live</span>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;">
+              <div style="background: #fee2e2; color: #ef4444; padding: 10px 6px; border-radius: 8px;">
+                <b id="countOpen" style="font-size: 20px;">0</b>
+                <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; margin-top: 2px;">Offen</div>
+              </div>
+              <div style="background: #fef3c7; color: #d97706; padding: 10px 6px; border-radius: 8px;">
+                <b id="countProgress" style="font-size: 20px;">0</b>
+                <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; margin-top: 2px;">In Arbeit</div>
+              </div>
+              <div style="background: #dcfce7; color: #16a34a; padding: 10px 6px; border-radius: 8px;">
+                <b id="countDone" style="font-size: 20px;">0</b>
+                <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; margin-top: 2px;">Fertig</div>
+              </div>
+            </div>
+          </div>"""
+
+          if "id=\"adminStatusBoard\"" not in content:
+              content = content.replace("<div class=\"grid\" id=\"stats\"></div>", "<div class=\"grid\" id=\"stats\"></div>\n" + board_html)
+
+          # 2. Skript-Ergänzung für Live-Update und Start/Fertig-Buttons
+          script_code = """<script id="roles-dashboard-system">
           window.SUPER_ADMIN_EMAIL = "alexaner.wild@gmail.com";
           window.userRoleCache = null;
 
-          window.getCurrentUserEmail = function() {
+          function getCurEmail() {
             try { return (typeof authEmail === "function" && authEmail()) || (currentUser && currentUser.email) || ""; }
             catch(e) { return ""; }
-          };
+          }
 
-          window.isUserAdmin = function() {
-            let email = (window.getCurrentUserEmail() || "").toLowerCase().trim();
-            return email === window.SUPER_ADMIN_EMAIL.toLowerCase().trim() || (window.userRoleCache && window.userRoleCache.role === "admin");
-          };
+          function isBoss() {
+            let em = (getCurEmail() || "").toLowerCase().trim();
+            return em === window.SUPER_ADMIN_EMAIL.toLowerCase().trim() || (window.userRoleCache && window.userRoleCache.role === "admin");
+          }
 
-          window.getCurrentMonteurTeam = function() {
-            if (window.isUserAdmin()) return null;
+          function getMyTeam() {
+            if (isBoss()) return null;
             if (window.userRoleCache && window.userRoleCache.team) return window.userRoleCache.team;
-            let email = window.getCurrentUserEmail();
-            return email ? email.split("@")[0] : null;
-          };
+            let em = getCurEmail();
+            return em ? em.split("@")[0] : null;
+          }
 
-          async function checkRoleAndAdjustUI() {
-            let email = window.getCurrentUserEmail();
-            if (!email) return;
+          async function checkRole() {
+            let em = getCurEmail();
+            if (!em) return;
             try {
               if (typeof db !== "undefined" && db) {
-                let snap = await db.collection("app_users").doc(email.toLowerCase()).get();
+                let snap = await db.collection("app_users").doc(em.toLowerCase()).get();
                 if (snap.exists) window.userRoleCache = snap.data();
               }
             } catch(err) {}
 
-            let admin = window.isUserAdmin();
+            let admin = isBoss();
             document.querySelectorAll("aside.side button[data-tab]").forEach(btn => {
               let tab = btn.getAttribute("data-tab");
               if (!admin && (tab === "projekte" || tab === "teams" || tab === "finanzen")) {
@@ -61,7 +87,7 @@ jobs:
           }
 
           if (typeof auth !== "undefined" && auth) {
-            auth.onAuthStateChanged(() => setTimeout(checkRoleAndAdjustUI, 300));
+            auth.onAuthStateChanged(() => setTimeout(checkRole, 300));
           }
 
           window.startRoomWork = async function(rid) {
@@ -86,81 +112,71 @@ jobs:
             if (typeof render === "function") render();
           };
 
+          // Patch wfRoomHtml
           if (typeof wfRoomHtml === "function") {
             const origWf = wfRoomHtml;
             wfRoomHtml = function(r, mode) {
-              let myTeam = window.getCurrentMonteurTeam();
-              if (myTeam && r.team && r.team.trim() !== "" && r.team.toLowerCase().trim() !== myTeam.toLowerCase().trim()) return "";
+              let t = getMyTeam();
+              if (t && r.team && r.team.trim() !== "" && r.team.toLowerCase().trim() !== t.toLowerCase().trim()) return "";
               let html = origWf(r, mode);
-              let badge = "<span style=\"padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;\">Offen</span>";
+
+              let badge = "<span style=\"display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;\">Offen</span>";
               if (r.completedAt || r.status === "completed") {
-                badge = "<span style=\"padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;\">Fertig</span>";
+                badge = "<span style=\"display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;\">Fertig</span>";
               } else if (r.startedAt || r.status === "in_progress") {
-                badge = "<span style=\"padding:2px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;\">In Arbeit</span>";
+                badge = "<span style=\"display:inline-block;padding:3px 8px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;\">In Arbeit</span>";
               }
 
               let btn = "";
               if (!r.startedAt) {
-                btn = "<button type=\"button\" class=\"btn green\" style=\"width:auto;padding:6px 12px;margin:0;font-size:12px;\" onclick=\"startRoomWork(\x27" + r.id + "\x27)\">▶ Start</button>";
+                btn = "<button type=\"button\" class=\"btn green\" style=\"width:auto;padding:6px 14px;margin:0;font-size:12px;\" onclick=\"startRoomWork(\x27" + r.id + "\x27)\">▶ Start</button>";
               } else if (!r.completedAt) {
-                btn = "<button type=\"button\" class=\"btn green\" style=\"width:auto;padding:6px 12px;margin:0;font-size:12px;background:#10b981;\" onclick=\"finishRoomWork(\x27" + r.id + "\x27)\">✔ Fertig</button>";
+                btn = "<button type=\"button\" class=\"btn green\" style=\"width:auto;padding:6px 14px;margin:0;font-size:12px;background:#10b981;\" onclick=\"finishRoomWork(\x27" + r.id + "\x27)\">✔ Fertig</button>";
               }
-              let box = "<div style=\"display:flex;justify-content:space-between;align-items:center;margin:6px 0;\">" + badge + btn + "</div>";
-              return html.replace(\x27class="wfHead">\x27, \x27class="wfHead">\x27 + box);
+
+              let controlRow = "<div style=\"display:flex;justify-content:space-between;align-items:center;padding:8px 0;margin:6px 0;border-bottom:1px solid #e2e8f0;\">" + badge + btn + "</div>";
+              return html.replace(/<div class="wfHead">/, "<div class=\"wfHead\">" + controlRow);
             };
           }
 
-          function drawAdminBoard() {
-            let target = document.getElementById("stats");
-            if (!target) return;
-
+          function refreshLiveCounters() {
             let rooms = [];
             try {
               let proj = (typeof p === "function") ? p() : null;
-              if (proj) {
-                rooms = proj.rooms || (proj.project && proj.project.rooms) || [];
-              }
-              if (!rooms.length && typeof project !== "undefined" && project) {
-                rooms = project.rooms || [];
-              }
+              if (proj) rooms = proj.rooms || (proj.project && proj.project.rooms) || [];
+              if (!rooms.length && typeof project !== "undefined" && project) rooms = project.rooms || [];
             } catch(e) {}
 
             let total = rooms.length;
-            let completed = rooms.filter(r => r.completedAt || r.status === "completed").length;
-            let inProgress = rooms.filter(r => (r.startedAt && !r.completedAt) || r.status === "in_progress").length;
-            let open = total > 0 ? (total - completed - inProgress) : 0;
+            let comp = rooms.filter(r => r.completedAt || r.status === "completed").length;
+            let inP = rooms.filter(r => (r.startedAt && !r.completedAt) || r.status === "in_progress").length;
+            let op = total > 0 ? Math.max(0, total - comp - inP) : 0;
 
-            let el = document.getElementById("adminStatusBoard");
-            if (!el) {
-              el = document.createElement("div");
-              el.id = "adminStatusBoard";
-              el.style.cssText = "margin:16px 0;padding:16px;background:#f8fafc;border-radius:10px;border:1px solid #cbd5e1;";
-              target.parentNode.insertBefore(el, target.nextSibling);
-            }
-            el.innerHTML = "<div style=\"font-weight:700;margin-bottom:10px;color:#1e293b;\">📊 Bauleiter Status-Übersicht</div><div style=\"display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;\"><div style=\"background:#fee2e2;color:#ef4444;padding:8px;border-radius:6px;\"><b style=\"font-size:18px;\">" + open + "</b><div style=\"font-size:11px;\">Offen</div></div><div style=\"background:#fef3c7;color:#d97706;padding:8px;border-radius:6px;\"><b style=\"font-size:18px;\">" + inProgress + "</b><div style=\"font-size:11px;\">In Arbeit</div></div><div style=\"background:#dcfce7;color:#16a34a;padding:8px;border-radius:6px;\"><b style=\"font-size:18px;\">" + completed + "</b><div style=\"font-size:11px;\">Fertig</div></div></div>";
+            let cO = document.getElementById("countOpen");
+            let cP = document.getElementById("countProgress");
+            let cD = document.getElementById("countDone");
+            if (cO) cO.textContent = op;
+            if (cP) cP.textContent = inP;
+            if (cD) cD.textContent = comp;
           }
 
-          if (typeof renderDash === "function") {
-            const origDash = renderDash;
-            renderDash = function() { origDash(); drawAdminBoard(); };
-          }
-          setInterval(drawAdminBoard, 1500);
+          setInterval(refreshLiveCounters, 1000);
           </script>"""
 
           import re
           if "id=\"roles-dashboard-system\"" in content:
-              content = re.sub(r"<script id=\"roles-dashboard-system\">[\s\S]*?<\/script>", script, content)
+              content = re.sub(r"<script id=\"roles-dashboard-system\">[\s\S]*?<\/script>", script_code, content)
           else:
-              content = content.replace("</body>", script + "\n</body>")
+              content = content.replace("</body>", script_code + "\n</body>")
 
           with open("index.html", "w", encoding="utf-8") as f:
               f.write(content)
           '
 
-      - name: Commit & Push
+      - name: Speichern
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Robust room data retrieval for admin dashboard" || echo "Keine Aenderung"
+          git commit -m "Insert static status board into dashboard and room control row" || echo "Keine Aenderung"
           git push
