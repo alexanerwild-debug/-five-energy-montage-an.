@@ -914,6 +914,7 @@ window.getRoomStatusSnippet = function(r) {
          '</div>';
 };
 
+// Performanter Menü-Einbau
 function ensurePmNavExists() {
   let aside = document.querySelector("aside.side");
   if (!aside) return;
@@ -947,12 +948,37 @@ function ensurePmNavExists() {
       let c = document.getElementById("programmierenContainer");
       if (c) { c.style.display = "block"; renderProgrammieren(); }
     };
+
+    document.querySelectorAll("aside.side button:not(#btnPmCockpit):not(#btnPmProg)").forEach(btn => {
+      btn.addEventListener("click", () => {
+        let c1 = document.getElementById("pmCockpitContainer");
+        let c2 = document.getElementById("programmierenContainer");
+        if (c1) c1.style.display = "none";
+        if (c2) c2.style.display = "none";
+      });
+    });
   }
 
   let admin = isBoss();
   let el = document.getElementById("pmNavGroup");
   if (el) el.style.display = admin ? "block" : "none";
 }
+
+// MutationObserver: Erfasst DOM-Updates sofort und ressourcenschonend
+const navObserver = new MutationObserver(() => {
+  let aside = document.querySelector("aside.side");
+  if (aside && !document.getElementById("pmNavGroup")) {
+    ensurePmNavExists();
+  }
+});
+
+window.addEventListener("DOMContentLoaded", () => {
+  ensurePmNavExists();
+  let aside = document.querySelector("aside.side");
+  if (aside) {
+    navObserver.observe(aside.parentElement || document.body, { childList: true, subtree: true });
+  }
+});
 
 window.renderPmCockpit = function() {
   let container = document.getElementById("pmCockpitContainer");
@@ -1111,7 +1137,7 @@ window.updateProgrammedCount = async function(compName, val) {
   renderProgrammieren();
 };
 
-// Nur noch minimaler Timer für das aktive Badge (extrem schonend)
+// Timer-Update ausschließlich für aktive Badges
 setInterval(() => {
   let rooms = getAppRooms();
   rooms.forEach(r => {
@@ -1121,10 +1147,6 @@ setInterval(() => {
     }
   });
 }, 1000);
-
-window.addEventListener("DOMContentLoaded", () => {
-  ensurePmNavExists();
-});
 </script>
 </body>
 </html>
