@@ -724,20 +724,45 @@ function getAppRooms() {
   return proj.rooms || (proj.project && proj.project.rooms) || [];
 }
 
-// Sicherer Speicherpfad: Nur die Raeume partiell updaten, damit kein Datenverlust entsteht
+// Dauerhafte Speicherung über alle nativen Methoden & Firestore Doc-Referenzen
 async function persistRoomsOnly() {
+  let proj = getAppProject();
+  let rooms = getAppRooms();
+
+  // 1. Native Save-Funktionen der App triggern
   try {
-    let rooms = getAppRooms();
+    if (typeof saveProject === "function") await saveProject();
+    else if (typeof save === "function") await save();
+  } catch(e) {}
+
+  // 2. Direkt auf Firestore schreiben
+  try {
     if (typeof fsProject === "function") {
-      await fsProject().update({ rooms: rooms });
-    } else if (typeof db !== "undefined" && db && typeof curProjectId !== "undefined") {
-      await db.collection("projects").doc(curProjectId).update({ rooms: rooms });
-    } else if (typeof save === "function") {
-      await save();
+      let ref = fsProject();
+      if (ref && typeof ref.update === "function") {
+        await ref.update({ rooms: rooms });
+      } else if (ref && typeof ref.set === "function") {
+        await ref.set({ rooms: rooms }, { merge: true });
+      }
     }
-  } catch(err) {
-    console.error("Fehler beim Speichern der Raeume:", err);
-  }
+  } catch(e) {}
+
+  // 3. Fallback über aktive Projekt-ID in Firestore
+  try {
+    let pid = (typeof curProjectId !== "undefined" && curProjectId) || 
+              (proj && (proj.id || (proj.project && proj.project.id)));
+    if (pid && typeof db !== "undefined" && db) {
+      await db.collection("projects").doc(pid).update({ rooms: rooms });
+    }
+  } catch(e) {}
+
+  // 4. LocalStorage Backup für sofortigen Offline-/Page-Reload-Schutz
+  try {
+    if (proj) {
+      let pid = proj.id || "current_project";
+      localStorage.setItem("fiv_backup_" + pid, JSON.stringify(rooms));
+    }
+  } catch(e) {}
 }
 
 window.formatSecs = function(ms) {
@@ -772,15 +797,12 @@ window.isRoomActive = function(r) {
   return (r.status === "in_progress" || (r.startedAt && !r.completedAt));
 };
 
-// 1. Basis-Ablauf: Start
 window.startRoomWork = async function(rid) {
   let rooms = getAppRooms();
-  let room = rooms.find(x => x.id === rid);
+  let room = rooms.find(x => x.id === rid || String(x.id) === String(rid));
   if (!room) return;
 
-  if (!room.workSessions) {
-    room.workSessions = [];
-  }
+  if (!room.workSessions) room.workSessions = [];
   let last = room.workSessions[room.workSessions.length - 1];
   if (!last || last.end) {
     room.workSessions.push({ start: Date.now(), end: null });
@@ -791,14 +813,13 @@ window.startRoomWork = async function(rid) {
   room.completedAt = null;
 
   await persistRoomsOnly();
+  updateAllRoomVisuals();
   if (typeof renderWorkflow === "function") renderWorkflow();
-  else if (typeof render === "function") render();
 };
 
-// 2. Basis-Ablauf: Fertigstellen (mit Sperre bei offener Klaerung)
 window.finishRoomWork = async function(rid) {
   let rooms = getAppRooms();
-  let room = rooms.find(x => x.id === rid);
+  let room = rooms.find(x => x.id === rid || String(x.id) === String(rid));
   if (!room) return;
 
   if (room.needsClarification && !room.clarificationResolved) {
@@ -818,14 +839,13 @@ window.finishRoomWork = async function(rid) {
   room.completedAt = now;
 
   await persistRoomsOnly();
+  updateAllRoomVisuals();
   if (typeof renderWorkflow === "function") renderWorkflow();
-  else if (typeof render === "function") render();
 };
 
-// 3. Zusaetzlicher Arbeitsabschnitt: Neuer Button
 window.addExtraSession = async function(rid) {
   let rooms = getAppRooms();
-  let room = rooms.find(x => x.id === rid);
+  let room = rooms.find(x => x.id === rid || String(x.id) === String(rid));
   if (!room) return;
 
   if (!room.workSessions) {
@@ -839,14 +859,13 @@ window.addExtraSession = async function(rid) {
   room.status = "in_progress";
 
   await persistRoomsOnly();
+  updateAllRoomVisuals();
   if (typeof renderWorkflow === "function") renderWorkflow();
-  else if (typeof render === "function") render();
 };
 
-// 4. Zusaetzlichen Arbeitsabschnitt wieder stoppen
 window.stopExtraSession = async function(rid) {
   let rooms = getAppRooms();
-  let room = rooms.find(x => x.id === rid);
+  let room = rooms.find(x => x.id === rid || String(x.id) === String(rid));
   if (!room) return;
 
   let now = Date.now();
@@ -856,11 +875,11 @@ window.stopExtraSession = async function(rid) {
   }
 
   await persistRoomsOnly();
+  updateAllRoomVisuals();
   if (typeof renderWorkflow === "function") renderWorkflow();
-  else if (typeof render === "function") render();
 };
 
-// UI-Rendering Snippet fuer jeden Raum mit 2 getrennten Buttons
+// HTML Snippet für Status + getrennte Buttons
 window.getRoomStatusSnippet = function(r) {
   let active = isRoomActive(r);
   let isDone = (r.status === "completed" || (r.completedAt && !active));
@@ -868,14 +887,13 @@ window.getRoomStatusSnippet = function(r) {
   let timeStr = formatSecs(totalMs);
   let sessCount = (r.workSessions || []).length;
 
-  let badge = '<span style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;">Offen</span>';
+  let badge = '<span class="status-badge" style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;">Offen</span>';
   if (isDone) {
-    badge = '<span style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;">✔ Abgeschlossen (' + timeStr + ')</span>';
+    badge = '<span class="status-badge" style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;">✔ Abgeschlossen (' + timeStr + ')</span>';
   } else if (active) {
-    badge = '<span id="timer-badge-' + r.id + '" style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;">⏱ In Arbeit (' + timeStr + ')</span>';
+    badge = '<span class="status-badge" id="timer-badge-' + r.id + '" style="display:inline-block;padding:4px 9px;border-radius:12px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;">⏱ In Arbeit (' + timeStr + ')</span>';
   }
 
-  // Button 1: Alter Button bleibt unberuehrt
   let btn1 = "";
   if (!active && !isDone) {
     btn1 = '<button type="button" class="btn green" style="width:auto;padding:6px 12px;margin:0;font-size:12px;" onclick="event.stopPropagation();startRoomWork(\'' + r.id + '\')">▶ Start</button>';
@@ -885,7 +903,6 @@ window.getRoomStatusSnippet = function(r) {
     btn1 = '<button type="button" class="btn" style="width:auto;padding:6px 12px;margin:0;font-size:12px;background:#e2e8f0;color:#64748b;cursor:default;" disabled>✔ Abgeschlossen</button>';
   }
 
-  // Button 2: Zusaetzlicher Button daneben fuer weitere Arbeitssitzungen
   let btn2 = "";
   if (isDone) {
     btn2 = '<button type="button" class="btn" style="width:auto;padding:6px 12px;margin-left:6px;font-size:12px;background:#3b82f6;color:#fff;" onclick="event.stopPropagation();addExtraSession(\'' + r.id + '\')">➕ Nacharbeit / Session ' + (sessCount + 1) + '</button>';
@@ -893,19 +910,45 @@ window.getRoomStatusSnippet = function(r) {
     btn2 = '<button type="button" class="btn" style="width:auto;padding:6px 12px;margin-left:6px;font-size:12px;background:#f59e0b;color:#fff;" onclick="event.stopPropagation();stopExtraSession(\'' + r.id + '\')">⏹ Session beenden</button>';
   }
 
-  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + '<div style="display:flex;align-items:center;">' + btn1 + btn2 + '</div></div>';
+  return '<div class="room-session-controls" data-room-id="' + r.id + '" style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + '<div style="display:flex;align-items:center;">' + btn1 + btn2 + '</div></div>';
 };
 
-// Live Sekundentakt
-setInterval(() => {
+// Hebt den Status direkt in den Raumkarten (Übersicht & Montage) hervor
+function updateAllRoomVisuals() {
   let rooms = getAppRooms();
   rooms.forEach(r => {
-    if (isRoomActive(r)) {
-      let badge = document.getElementById("timer-badge-" + r.id);
-      if (badge) badge.textContent = "⏱ In Arbeit (" + formatSecs(getRoomTotalDurationMs(r)) + ")";
+    let active = isRoomActive(r);
+    let isDone = (r.status === "completed" || (r.completedAt && !active));
+    let timeStr = formatSecs(getRoomTotalDurationMs(r));
+
+    // Alle DOM-Elemente finden, die diesem Raum zugeordnet sind
+    let roomEls = document.querySelectorAll(`[data-id="${r.id}"], [data-room-id="${r.id}"], .room-card, .room-item`);
+    roomEls.forEach(el => {
+      let cardText = el.textContent || "";
+      if (el.getAttribute("data-id") === String(r.id) || el.getAttribute("data-room-id") === String(r.id) || (r.name && cardText.includes(r.name))) {
+        let existingBadge = el.querySelector(".card-status-indicator");
+        let statusHtml = isDone 
+          ? `<span class="card-status-indicator" style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;margin-left:6px;">✔ Fertig (${timeStr})</span>`
+          : (active ? `<span class="card-status-indicator" style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;margin-left:6px;">⏱ In Bearbeitung (${timeStr})</span>` : '');
+
+        if (existingBadge) {
+          existingBadge.outerHTML = statusHtml;
+        } else if (statusHtml) {
+          let titleEl = el.querySelector("h3, h4, .title, b, strong") || el;
+          titleEl.insertAdjacentHTML("beforeend", statusHtml);
+        }
+      }
+    });
+
+    // Timer-Badge im Detailbereich aktualisieren falls sichtbar
+    let badge = document.getElementById("timer-badge-" + r.id);
+    if (badge && active) {
+      badge.textContent = "⏱ In Arbeit (" + timeStr + ")";
     }
   });
-}, 1000);
+}
+
+setInterval(updateAllRoomVisuals, 1000);
 
 function hidePmViews() {
   let c1 = document.getElementById("pmCockpitContainer");
