@@ -1,4 +1,4 @@
-name: Remove CPU Bottleneck and Restore Performance
+name: Robust MutationObserver Navigation and Performance Fix
 
 on:
   workflow_dispatch:
@@ -7,14 +7,14 @@ permissions:
   contents: write
 
 jobs:
-  fix-perf:
+  fix-nav-observer:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Strip heavy intervals and apply event-driven logic
+      - name: Patch index.html with MutationObserver menu watcher
         run: |
           python3 - << 'EOF'
           with open("index.html", "r", encoding="utf-8") as f:
@@ -238,6 +238,7 @@ jobs:
                    '</div>';
           };
 
+          // Performanter Menü-Einbau
           function ensurePmNavExists() {
             let aside = document.querySelector("aside.side");
             if (!aside) return;
@@ -271,12 +272,37 @@ jobs:
                 let c = document.getElementById("programmierenContainer");
                 if (c) { c.style.display = "block"; renderProgrammieren(); }
               };
+
+              document.querySelectorAll("aside.side button:not(#btnPmCockpit):not(#btnPmProg)").forEach(btn => {
+                btn.addEventListener("click", () => {
+                  let c1 = document.getElementById("pmCockpitContainer");
+                  let c2 = document.getElementById("programmierenContainer");
+                  if (c1) c1.style.display = "none";
+                  if (c2) c2.style.display = "none";
+                });
+              });
             }
 
             let admin = isBoss();
             let el = document.getElementById("pmNavGroup");
             if (el) el.style.display = admin ? "block" : "none";
           }
+
+          // MutationObserver: Erfasst DOM-Updates sofort und ressourcenschonend
+          const navObserver = new MutationObserver(() => {
+            let aside = document.querySelector("aside.side");
+            if (aside && !document.getElementById("pmNavGroup")) {
+              ensurePmNavExists();
+            }
+          });
+
+          window.addEventListener("DOMContentLoaded", () => {
+            ensurePmNavExists();
+            let aside = document.querySelector("aside.side");
+            if (aside) {
+              navObserver.observe(aside.parentElement || document.body, { childList: true, subtree: true });
+            }
+          });
 
           window.renderPmCockpit = function() {
             let container = document.getElementById("pmCockpitContainer");
@@ -435,7 +461,7 @@ jobs:
             renderProgrammieren();
           };
 
-          // Nur noch minimaler Timer für das aktive Badge (extrem schonend)
+          // Timer-Update ausschließlich für aktive Badges
           setInterval(() => {
             let rooms = getAppRooms();
             rooms.forEach(r => {
@@ -445,10 +471,6 @@ jobs:
               }
             });
           }, 1000);
-
-          window.addEventListener("DOMContentLoaded", () => {
-            ensurePmNavExists();
-          });
           </script>"""
 
           import re
@@ -466,6 +488,6 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add index.html
-          git commit -m "Eliminate heavy intervals and fix performance" || echo "Keine Aenderung"
+          git commit -m "Add MutationObserver for resilient PM menu without CPU load" || echo "Keine Aenderung"
           git pull --rebase origin main
           git push origin main
