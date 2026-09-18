@@ -88,7 +88,6 @@ jobs:
             }
           }
 
-          // Session-Hilfsfunktionen
           window.getRoomTotalDurationMinutes = function(r) {
             let sessions = r.workSessions || [];
             let totalMs = 0;
@@ -116,7 +115,6 @@ jobs:
             return (r.status === "in_progress" || (r.startedAt && !r.completedAt));
           };
 
-          // 1. Raum starten (Erst-Start oder Fortsetzen)
           window.startRoomWork = async function(rid) {
             let rooms = getAppRooms();
             let room = rooms.find(x => x.id === rid);
@@ -147,7 +145,6 @@ jobs:
             refreshLiveCounters();
           };
 
-          // 2. Raum abschließen
           window.finishRoomWork = async function(rid) {
             let rooms = getAppRooms();
             let room = rooms.find(x => x.id === rid);
@@ -170,7 +167,6 @@ jobs:
             refreshLiveCounters();
           };
 
-          // UI-Rendering Snippet fuer jeden Raum
           window.getRoomStatusSnippet = function(r) {
             let active = isRoomActive(r);
             let isDone = (r.status === "completed" || (r.completedAt && !active));
@@ -198,7 +194,6 @@ jobs:
             return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;margin:6px 0;border-bottom:1px solid #f1f5f9;">' + badge + btn + '</div>';
           };
 
-          // Live-Zaehler fuer Dashboard
           function refreshLiveCounters() {
             let rooms = getAppRooms();
             let total = rooms.length;
@@ -240,7 +235,7 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git pull --rebase origin main
           git add index.html
           git commit -m "Add multi-session room tracking and persistent background sync" || echo "Keine Aenderung"
+          git pull --rebase origin main
           git push origin main
