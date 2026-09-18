@@ -134,31 +134,31 @@ window.getRoomStatusSnippet = function(r) {
     ⚡ FIV.Energy
   </div>
 
-  <!-- PROJEKTLEITER BEREICH (nur fuer Admin) -->
+  <!-- PROJEKTLEITER BEREICH (nur für Admin sichtbar) -->
   <div class="pm-only" style="margin-bottom: 12px;">
     <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 8px;text-transform:uppercase;letter-spacing:0.5px;">Projektleiter</div>
-    <button type="button" data-tab="pm-cockpit" onclick="switchAppTab('pm-cockpit')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">📊 Projektleiter-Cockpit</button>
-    <button type="button" data-tab="programmieren" onclick="switchAppTab('programmieren')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">💻 Programmieren</button>
-    <button type="button" data-tab="projekte" onclick="switchAppTab('projekte')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">📁 Projekte & Archiv</button>
-    <button type="button" data-tab="teams" onclick="switchAppTab('teams')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">👥 Teams</button>
+    <button type="button" data-tab="pm-cockpit" onclick="openPmTab('pm-cockpit', this)">📊 Projektleiter-Cockpit</button>
+    <button type="button" data-tab="programmieren" onclick="openPmTab('programmieren', this)">💻 Programmieren</button>
+    <button type="button" data-tab="projekte" onclick="setTab('projekte', this)">📁 Projekte & Archiv</button>
+    <button type="button" data-tab="teams" onclick="setTab('teams', this)">👥 Teams</button>
   </div>
 
-  <!-- ABWICKLUNG -->
+  <!-- ABWICKLUNG / BAUSTELLE -->
   <div style="margin-bottom: 12px;">
     <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 8px;text-transform:uppercase;letter-spacing:0.5px;">Abwicklung / Baustelle</div>
-    <button type="button" data-tab="overview" onclick="switchAppTab('overview')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">🏠 Übersicht</button>
-    <button type="button" data-tab="aufnahme" onclick="switchAppTab('aufnahme')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">📝 Aufnahme Räume</button>
-    <button type="button" data-tab="montage" onclick="switchAppTab('montage')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">🔧 Montage</button>
-    <button type="button" data-tab="plaene" onclick="switchAppTab('plaene')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">🗺️ Pläne</button>
+    <button type="button" data-tab="dash" class="active" onclick="openNativeTab('dash', this)">🏠 Übersicht</button>
+    <button type="button" data-tab="survey" onclick="openNativeTab('survey', this)">📝 Aufnahme Räume</button>
+    <button type="button" data-tab="wf" onclick="openNativeTab('wf', this)">🔧 Montage</button>
+    <button type="button" data-tab="plans" onclick="openNativeTab('plans', this)">🗺️ Pläne</button>
   </div>
 
   <!-- WISSEN & VORBEREITUNG -->
   <div style="margin-bottom: 12px;">
     <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 8px;text-transform:uppercase;letter-spacing:0.5px;">Wissen & Vorbereitung</div>
-    <button type="button" data-tab="komponenten" onclick="switchAppTab('komponenten')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">📦 Komponenten</button>
-    <button type="button" data-tab="anlernprozess" onclick="switchAppTab('anlernprozess')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">🔄 Anlernprozess</button>
-    <button type="button" data-tab="arbeitsvorbereitung" onclick="switchAppTab('arbeitsvorbereitung')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">🧰 Arbeitsvorbereitung</button>
-    <button type="button" data-tab="montageanleitungen" onclick="switchAppTab('montageanleitungen')" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:9px 10px;margin:2px 0;font-size:13px;font-weight:600;background:transparent;border:none;border-radius:6px;cursor:pointer;">📖 Montageanleitungen</button>
+    <button type="button" data-tab="components" onclick="openNativeTab('components', this)">📦 Komponenten</button>
+    <button type="button" data-tab="anlernprozess" onclick="openNativeTab('anlernprozess', this)">🔄 Anlernprozess</button>
+    <button type="button" data-tab="prep" onclick="openNativeTab('prep', this)">🧰 Arbeitsvorbereitung</button>
+    <button type="button" data-tab="guides" onclick="openNativeTab('guides', this)">📖 Montageanleitungen</button>
   </div>
 </aside><main>
 <section id="dashboard" class="section active"><h1 id="dashTitle">Dashboard</h1><div class="grid" id="stats"></div>
@@ -775,13 +775,6 @@ function isBoss() {
   return em === window.SUPER_ADMIN_EMAIL.toLowerCase().trim() || (window.userRoleCache && window.userRoleCache.role === "admin");
 }
 
-function getMyTeam() {
-  if (isBoss()) return null;
-  if (window.userRoleCache && window.userRoleCache.team) return window.userRoleCache.team;
-  let em = getCurEmail();
-  return em ? em.split("@")[0] : null;
-}
-
 function getAppProject() {
   try {
     if (typeof p === "function") return p();
@@ -810,6 +803,53 @@ async function persistData() {
     console.error("Persistenz-Fehler:", err);
   }
 }
+
+// Tab-Routing: Native Tabs sauber öffnen
+window.openNativeTab = function(tabKey, el) {
+  let pmCockpit = document.getElementById("pmCockpitContainer");
+  let prog = document.getElementById("programmierenContainer");
+  if (pmCockpit) pmCockpit.style.display = "none";
+  if (prog) prog.style.display = "none";
+
+  document.querySelectorAll("aside.side button").forEach(b => b.classList.remove("active"));
+  if (el) el.classList.add("active");
+
+  if (typeof setTab === "function") {
+    setTab(tabKey, el);
+  } else if (typeof showTab === "function") {
+    showTab(tabKey);
+  }
+};
+
+// Tab-Routing: PM Tabs öffnen
+window.openPmTab = function(tabKey, el) {
+  // Alle nativen Views ausblenden
+  document.querySelectorAll("main > div, main > section").forEach(d => {
+    if (d.id !== "pmCockpitContainer" && d.id !== "programmierenContainer") {
+      d.style.display = "none";
+    }
+  });
+
+  document.querySelectorAll("aside.side button").forEach(b => b.classList.remove("active"));
+  if (el) el.classList.add("active");
+
+  let pmCockpit = document.getElementById("pmCockpitContainer");
+  let prog = document.getElementById("programmierenContainer");
+
+  if (tabKey === "pm-cockpit") {
+    if (prog) prog.style.display = "none";
+    if (pmCockpit) {
+      pmCockpit.style.display = "block";
+      renderPmCockpit();
+    }
+  } else if (tabKey === "programmieren") {
+    if (pmCockpit) pmCockpit.style.display = "none";
+    if (prog) {
+      prog.style.display = "block";
+      renderProgrammieren();
+    }
+  }
+};
 
 window.formatSecs = function(ms) {
   let totalSecs = Math.max(0, Math.floor(ms / 1000));
@@ -1082,26 +1122,6 @@ window.updateProgrammedCount = async function(compName, val) {
   proj.programmedComponents[compName] = parseInt(val, 10) || 0;
   await persistData();
   renderProgrammieren();
-};
-
-window.switchAppTab = function(tabName) {
-  document.querySelectorAll("main > section, .tab-content, #pmCockpitContainer, #programmierenContainer").forEach(el => el.style.display = "none");
-  document.querySelectorAll("aside.side button[data-tab]").forEach(b => b.classList.remove("active"));
-
-  let activeBtn = document.querySelector('aside.side button[data-tab="' + tabName + '"]');
-  if (activeBtn) activeBtn.classList.add("active");
-
-  if (tabName === "pm-cockpit") {
-    let c = document.getElementById("pmCockpitContainer");
-    if (c) { c.style.display = "block"; renderPmCockpit(); }
-  } else if (tabName === "programmieren") {
-    let c = document.getElementById("programmierenContainer");
-    if (c) { c.style.display = "block"; renderProgrammieren(); }
-  } else {
-    let target = document.getElementById(tabName) || document.querySelector('[data-view="' + tabName + '"]');
-    if (target) target.style.display = "block";
-    if (typeof showTab === "function") showTab(tabName);
-  }
 };
 
 async function checkRoleAndApplyMenu() {
