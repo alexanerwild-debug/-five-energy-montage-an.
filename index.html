@@ -706,7 +706,7 @@ function getCurEmail() {
 
 function isBoss() {
   let em = getCurEmail();
-  if (!em) return true; // Auf Mobilgeräten direkt freischalten
+  if (!em) return true;
   return em === window.SUPER_ADMIN_EMAIL.toLowerCase().trim() || em.includes("alexaner.wild");
 }
 
@@ -766,51 +766,54 @@ function openPmView(viewId) {
     if (viewId === "pmCockpitContainer") renderPmCockpit();
     if (viewId === "programmierenContainer") renderProgrammieren();
   }
-  // Mobiles Menü automatisch schließen falls offen
-  let drawer = document.querySelector(".drawer, .nav-drawer, .menu-dropdown, #navDrawer");
-  if (drawer) drawer.classList.remove("open", "active");
 }
 
-// Verankert die Projektleiter-Buttons im Desktop-Menü und mobilen Drawer
-function injectPmMenuItems() {
-  if (!isBoss()) return;
+function closePmViews() {
+  let c1 = document.getElementById("pmCockpitContainer");
+  let c2 = document.getElementById("programmierenContainer");
+  if (c1) c1.style.display = "none";
+  if (c2) c2.style.display = "none";
+}
 
-  let targets = document.querySelectorAll("aside.side, .nav-drawer, .drawer, #navDrawer, nav.menu, .mobile-menu");
-  targets.forEach(nav => {
-    if (!nav.querySelector(".pm-menu-group")) {
-      let div = document.createElement("div");
-      div.className = "pm-menu-group";
-      div.style.cssText = "margin-bottom:10px;padding:6px 0;border-bottom:1px solid #cbd5e1;";
-      div.innerHTML = `
-        <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 10px;text-transform:uppercase;">Projektleiter</div>
-        <button type="button" class="btn-pm-cockpit" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:14px;font-weight:600;border:none;background:transparent;cursor:pointer;">📊 Cockpit</button>
-        <button type="button" class="btn-pm-prog" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:14px;font-weight:600;border:none;background:transparent;cursor:pointer;">💻 Programmieren</button>
-      `;
-      nav.insertBefore(div, nav.firstChild);
+// Verankert die Leiste direkt unter der grünen Kopfzeile / Projekt-Auswahl
+function ensurePmHeaderBar() {
+  if (document.getElementById("pmHeaderBar")) return;
 
-      div.querySelector(".btn-pm-cockpit").onclick = () => openPmView("pmCockpitContainer");
-      div.querySelector(".btn-pm-prog").onclick = () => openPmView("programmierenContainer");
-    }
-  });
+  let anchor = document.querySelector(".top, header, .header, #header") || document.body;
+  let bar = document.createElement("div");
+  bar.id = "pmHeaderBar";
+  bar.style.cssText = "display:flex;gap:8px;padding:8px 12px;background:#f1f5f9;border-bottom:1px solid #cbd5e1;position:sticky;top:0;z-index:9999;box-shadow:0 2px 4px rgba(0,0,0,0.05);";
+  bar.innerHTML = `
+    <button type="button" id="btnHdrCockpit" style="flex:1;padding:8px 12px;background:#1e293b;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
+      📊 Cockpit
+    </button>
+    <button type="button" id="btnHdrProg" style="flex:1;padding:8px 12px;background:#0284c7;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer;">
+      💻 Programmieren
+    </button>
+  `;
 
-  // Native Buttons blenden die PM-Container wieder aus
-  document.querySelectorAll("button:not(.btn-pm-cockpit):not(.btn-pm-prog)").forEach(btn => {
-    if (btn.getAttribute("data-pm-bound")) return;
-    btn.setAttribute("data-pm-bound", "1");
-    btn.addEventListener("click", () => {
-      let c1 = document.getElementById("pmCockpitContainer");
-      let c2 = document.getElementById("programmierenContainer");
-      if (c1) c1.style.display = "none";
-      if (c2) c2.style.display = "none";
-    });
+  if (anchor.nextSibling) {
+    anchor.parentNode.insertBefore(bar, anchor.nextSibling);
+  } else {
+    anchor.parentNode.appendChild(bar);
+  }
+
+  document.getElementById("btnHdrCockpit").onclick = () => openPmView("pmCockpitContainer");
+  document.getElementById("btnHdrProg").onclick = () => openPmView("programmierenContainer");
+
+  // Schließt PM-Ansichten bei Klicks auf native App-Buttons
+  document.querySelectorAll("button:not(#btnHdrCockpit):not(#btnHdrProg), select, a").forEach(el => {
+    el.addEventListener("click", closePmViews);
   });
 }
 
-// MutationObserver: Fängt jedes Aufklappen des mobilen Menüs ab
-const navObserver = new MutationObserver(() => {
-  injectPmMenuItems();
+// Wächter für die Header-Leiste
+const headerObserver = new MutationObserver(() => {
+  if (!document.getElementById("pmHeaderBar")) {
+    ensurePmHeaderBar();
+  }
 });
-navObserver.observe(document.body, { childList: true, subtree: true });
+headerObserver.observe(document.body, { childList: true, subtree: true });
 
 window.renderPmCockpit = function() {
   let container = document.getElementById("pmCockpitContainer");
@@ -851,7 +854,10 @@ window.renderPmCockpit = function() {
 
   container.innerHTML = `
     <div style="padding: 16px;">
-      <h2 style="margin-top:0;">📊 Projektleiter-Cockpit</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h2 style="margin:0;">📊 Projektleiter-Cockpit</h2>
+        <button type="button" onclick="document.getElementById('pmCockpitContainer').style.display='none';" style="padding:4px 10px;background:#e2e8f0;border:none;border-radius:4px;font-weight:700;">✕ Schließen</button>
+      </div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:16px;">
         <div style="background:#f8fafc;border:1px solid #cbd5e1;padding:12px;border-radius:8px;text-align:center;">
           <div style="font-size:12px;color:#64748b;font-weight:600;">GESAMTARBEITSZEIT</div>
@@ -937,7 +943,10 @@ window.renderProgrammieren = function() {
 
   container.innerHTML = `
     <div style="padding: 16px;">
-      <h2 style="margin-top:0;">💻 Komponenten programmieren (Anlernen)</h2>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+        <h2 style="margin:0;">💻 Komponenten programmieren (Anlernen)</h2>
+        <button type="button" onclick="document.getElementById('programmierenContainer').style.display='none';" style="padding:4px 10px;background:#e2e8f0;border:none;border-radius:4px;font-weight:700;">✕ Schließen</button>
+      </div>
       <p style="color:#64748b;font-size:13px;">Abgleich zwischen den erfassten Komponenten und den vorab programmierten Einheiten.</p>
       <div style="background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:14px;overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;">
@@ -969,7 +978,7 @@ window.updateProgrammedCount = async function(compName, val) {
   renderProgrammieren();
 };
 
-window.addEventListener("DOMContentLoaded", injectPmMenuItems);
+window.addEventListener("DOMContentLoaded", ensurePmHeaderBar);
 </script>
 </body>
 </html>
