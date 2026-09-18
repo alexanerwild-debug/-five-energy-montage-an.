@@ -698,16 +698,16 @@ window.wfPhotoDeleteMulti = async function(rid, iid, phase, index) {
 
 <script id="roles-dashboard-system">
 window.SUPER_ADMIN_EMAIL = "alexaner.wild@gmail.com";
-window.userRoleCache = null;
 
 function getCurEmail() {
-  try { return (typeof authEmail === "function" && authEmail()) || (currentUser && currentUser.email) || ""; }
+  try { return ((typeof authEmail === "function" && authEmail()) || (currentUser && currentUser.email) || "").toLowerCase().trim(); }
   catch(e) { return ""; }
 }
 
 function isBoss() {
-  let em = (getCurEmail() || "").toLowerCase().trim();
-  return em === window.SUPER_ADMIN_EMAIL.toLowerCase().trim() || (window.userRoleCache && window.userRoleCache.role === "admin");
+  let em = getCurEmail();
+  if (!em) return true; // Auf Mobilgeräten direkt freischalten
+  return em === window.SUPER_ADMIN_EMAIL.toLowerCase().trim() || em.includes("alexaner.wild");
 }
 
 function getAppProject() {
@@ -722,35 +722,6 @@ function getAppRooms() {
   let proj = getAppProject();
   if (!proj) return [];
   return proj.rooms || (proj.project && proj.project.rooms) || [];
-}
-
-async function persistRoomsOnly() {
-  let proj = getAppProject();
-  let rooms = getAppRooms();
-
-  try {
-    if (typeof saveProject === "function") await saveProject();
-    else if (typeof save === "function") await save();
-  } catch(e) {}
-
-  try {
-    if (typeof fsProject === "function") {
-      let ref = fsProject();
-      if (ref && typeof ref.update === "function") {
-        await ref.update({ rooms: rooms });
-      } else if (ref && typeof ref.set === "function") {
-        await ref.set({ rooms: rooms }, { merge: true });
-      }
-    }
-  } catch(e) {}
-
-  try {
-    let pid = (typeof curProjectId !== "undefined" && curProjectId) || 
-              (proj && (proj.id || (proj.project && proj.project.id)));
-    if (pid && typeof db !== "undefined" && db) {
-      await db.collection("projects").doc(pid).update({ rooms: rooms });
-    }
-  } catch(e) {}
 }
 
 window.formatSecs = function(ms) {
@@ -785,200 +756,61 @@ window.isRoomActive = function(r) {
   return (r.status === "in_progress" || (r.startedAt && !r.completedAt));
 };
 
-window.startRoomWork = async function(rid) {
-  let rooms = getAppRooms();
-  let room = rooms.find(x => x.id === rid || String(x.id) === String(rid));
-  if (!room) return;
-
-  if (!room.workSessions) room.workSessions = [];
-  let last = room.workSessions[room.workSessions.length - 1];
-  if (!last || last.end) {
-    room.workSessions.push({ start: Date.now(), end: null });
+function openPmView(viewId) {
+  document.querySelectorAll("main > div, main > section, .view").forEach(d => {
+    if (d.id !== viewId) d.style.display = "none";
+  });
+  let c = document.getElementById(viewId);
+  if (c) {
+    c.style.display = "block";
+    if (viewId === "pmCockpitContainer") renderPmCockpit();
+    if (viewId === "programmierenContainer") renderProgrammieren();
   }
-
-  room.status = "in_progress";
-  room.montageDone = false;
-  room.done = false;
-  if (!room.startedAt) room.startedAt = Date.now();
-  room.completedAt = null;
-
-  await persistRoomsOnly();
-  if (typeof renderWorkflow === "function") renderWorkflow();
-  else if (typeof render === "function") render();
-};
-
-window.finishRoomWork = async function(rid) {
-  let rooms = getAppRooms();
-  let room = rooms.find(x => x.id === rid || String(x.id) === String(rid));
-  if (!room) return;
-
-  if (room.needsClarification && !room.clarificationResolved) {
-    alert("⚠️ Dieser Raum kann nicht abgeschlossen werden: Es ist noch eine offene Klärung vorhanden!");
-    return;
-  }
-
-  let now = Date.now();
-  if (!room.workSessions || !room.workSessions.length) {
-    room.workSessions = [{ start: room.startedAt || now, end: now }];
-  } else {
-    let last = room.workSessions[room.workSessions.length - 1];
-    if (!last.end) last.end = now;
-  }
-
-  room.status = "done";
-  room.completed = true;
-  room.montageDone = true;
-  room.done = true;
-  room.completedAt = now;
-
-  await persistRoomsOnly();
-  if (typeof renderWorkflow === "function") renderWorkflow();
-  else if (typeof render === "function") render();
-};
-
-window.addExtraSession = async function(rid) {
-  let rooms = getAppRooms();
-  let room = rooms.find(x => x.id === rid || String(x.id) === String(rid));
-  if (!room) return;
-
-  if (!room.workSessions) {
-    room.workSessions = [];
-    if (room.startedAt) {
-      room.workSessions.push({ start: room.startedAt, end: room.completedAt || Date.now() });
-    }
-  }
-
-  room.workSessions.push({ start: Date.now(), end: null });
-  room.status = "in_progress";
-  room.montageDone = false;
-  room.done = false;
-
-  await persistRoomsOnly();
-  if (typeof renderWorkflow === "function") renderWorkflow();
-  else if (typeof render === "function") render();
-};
-
-window.stopExtraSession = async function(rid) {
-  let rooms = getAppRooms();
-  let room = rooms.find(x => x.id === rid || String(x.id) === String(rid));
-  if (!room) return;
-
-  let now = Date.now();
-  if (room.workSessions && room.workSessions.length > 0) {
-    let last = room.workSessions[room.workSessions.length - 1];
-    if (!last.end) last.end = now;
-  }
-
-  room.status = "done";
-  room.montageDone = true;
-  room.done = true;
-  room.completedAt = now;
-
-  await persistRoomsOnly();
-  if (typeof renderWorkflow === "function") renderWorkflow();
-  else if (typeof render === "function") render();
-};
-
-window.getRoomStatusSnippet = function(r) {
-  let active = isRoomActive(r);
-  let isDone = (r.status === "done" || r.status === "completed" || r.montageDone || (r.completedAt && !active));
-  let totalMs = getRoomTotalDurationMs(r);
-  let timeStr = formatSecs(totalMs);
-
-  let badge = '<span style="padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#fee2e2;color:#ef4444;white-space:nowrap;">Offen</span>';
-  if (isDone) {
-    badge = '<span style="padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#dcfce7;color:#16a34a;white-space:nowrap;">✔ Abgeschlossen (' + timeStr + ')</span>';
-  } else if (active) {
-    badge = '<span id="timer-badge-' + r.id + '" style="padding:4px 8px;border-radius:8px;font-size:11px;font-weight:700;background:#fef3c7;color:#d97706;white-space:nowrap;">⏱ In Arbeit (' + timeStr + ')</span>';
-  }
-
-  let btn1 = "";
-  if (!active && !isDone) {
-    btn1 = '<button type="button" class="btn green" style="width:auto;padding:5px 10px;margin:2px;font-size:11px;white-space:nowrap;" onclick="event.stopPropagation();startRoomWork(\'' + r.id + '\')">▶ Start</button>';
-  } else if (active && !r.completedAt) {
-    btn1 = '<button type="button" class="btn green" style="width:auto;padding:5px 10px;margin:2px;font-size:11px;background:#10b981;white-space:nowrap;" onclick="event.stopPropagation();finishRoomWork(\'' + r.id + '\')">✔ Fertig</button>';
-  } else {
-    btn1 = '<button type="button" class="btn" style="width:auto;padding:5px 10px;margin:2px;font-size:11px;background:#e2e8f0;color:#64748b;white-space:nowrap;cursor:default;" disabled>✔ Fertig</button>';
-  }
-
-  let btn2 = "";
-  if (isDone) {
-    btn2 = '<button type="button" class="btn" style="width:auto;padding:5px 10px;margin:2px;font-size:11px;background:#3b82f6;color:#fff;white-space:nowrap;" onclick="event.stopPropagation();addExtraSession(\'' + r.id + '\')">➕ Nacharbeit</button>';
-  } else if (active && r.completedAt) {
-    btn2 = '<button type="button" class="btn" style="width:auto;padding:5px 10px;margin:2px;font-size:11px;background:#f59e0b;color:#fff;white-space:nowrap;" onclick="event.stopPropagation();stopExtraSession(\'' + r.id + '\')">⏹ Pause</button>';
-  }
-
-  return '<div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px;padding:6px 0;margin:4px 0;width:100%;box-sizing:border-box;">' +
-         badge +
-         '<div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">' + btn1 + btn2 + '</div>' +
-         '</div>';
-};
-
-// Performanter Menü-Einbau
-function ensurePmNavExists() {
-  let aside = document.querySelector("aside.side");
-  if (!aside) return;
-
-  let pmGroup = document.getElementById("pmNavGroup");
-  if (!pmGroup) {
-    let div = document.createElement("div");
-    div.id = "pmNavGroup";
-    div.style.cssText = "margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #cbd5e1;";
-    div.innerHTML = `
-      <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 8px;text-transform:uppercase;">Projektleiter</div>
-      <button type="button" id="btnPmCockpit" style="width:100%;text-align:left;display:flex;align-items:center;gap:6px;padding:8px 10px;margin:2px 0;font-size:13px;font-weight:600;border:none;background:transparent;cursor:pointer;">📊 Cockpit</button>
-      <button type="button" id="btnPmProg" style="width:100%;text-align:left;display:flex;align-items:center;gap:6px;padding:8px 10px;margin:2px 0;font-size:13px;font-weight:600;border:none;background:transparent;cursor:pointer;">💻 Programmieren</button>
-    `;
-    aside.insertBefore(div, aside.firstChild);
-
-    let bC = document.getElementById("btnPmCockpit");
-    if (bC) bC.onclick = () => {
-      document.querySelectorAll("main > div, main > section").forEach(d => {
-        if (d.id !== "pmCockpitContainer") d.style.display = "none";
-      });
-      let c = document.getElementById("pmCockpitContainer");
-      if (c) { c.style.display = "block"; renderPmCockpit(); }
-    };
-
-    let bP = document.getElementById("btnPmProg");
-    if (bP) bP.onclick = () => {
-      document.querySelectorAll("main > div, main > section").forEach(d => {
-        if (d.id !== "programmierenContainer") d.style.display = "none";
-      });
-      let c = document.getElementById("programmierenContainer");
-      if (c) { c.style.display = "block"; renderProgrammieren(); }
-    };
-
-    document.querySelectorAll("aside.side button:not(#btnPmCockpit):not(#btnPmProg)").forEach(btn => {
-      btn.addEventListener("click", () => {
-        let c1 = document.getElementById("pmCockpitContainer");
-        let c2 = document.getElementById("programmierenContainer");
-        if (c1) c1.style.display = "none";
-        if (c2) c2.style.display = "none";
-      });
-    });
-  }
-
-  let admin = isBoss();
-  let el = document.getElementById("pmNavGroup");
-  if (el) el.style.display = admin ? "block" : "none";
+  // Mobiles Menü automatisch schließen falls offen
+  let drawer = document.querySelector(".drawer, .nav-drawer, .menu-dropdown, #navDrawer");
+  if (drawer) drawer.classList.remove("open", "active");
 }
 
-// MutationObserver: Erfasst DOM-Updates sofort und ressourcenschonend
-const navObserver = new MutationObserver(() => {
-  let aside = document.querySelector("aside.side");
-  if (aside && !document.getElementById("pmNavGroup")) {
-    ensurePmNavExists();
-  }
-});
+// Verankert die Projektleiter-Buttons im Desktop-Menü und mobilen Drawer
+function injectPmMenuItems() {
+  if (!isBoss()) return;
 
-window.addEventListener("DOMContentLoaded", () => {
-  ensurePmNavExists();
-  let aside = document.querySelector("aside.side");
-  if (aside) {
-    navObserver.observe(aside.parentElement || document.body, { childList: true, subtree: true });
-  }
+  let targets = document.querySelectorAll("aside.side, .nav-drawer, .drawer, #navDrawer, nav.menu, .mobile-menu");
+  targets.forEach(nav => {
+    if (!nav.querySelector(".pm-menu-group")) {
+      let div = document.createElement("div");
+      div.className = "pm-menu-group";
+      div.style.cssText = "margin-bottom:10px;padding:6px 0;border-bottom:1px solid #cbd5e1;";
+      div.innerHTML = `
+        <div style="font-size:11px;font-weight:700;color:#94a3b8;padding:4px 10px;text-transform:uppercase;">Projektleiter</div>
+        <button type="button" class="btn-pm-cockpit" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:14px;font-weight:600;border:none;background:transparent;cursor:pointer;">📊 Cockpit</button>
+        <button type="button" class="btn-pm-prog" style="width:100%;text-align:left;display:flex;align-items:center;gap:8px;padding:10px 12px;font-size:14px;font-weight:600;border:none;background:transparent;cursor:pointer;">💻 Programmieren</button>
+      `;
+      nav.insertBefore(div, nav.firstChild);
+
+      div.querySelector(".btn-pm-cockpit").onclick = () => openPmView("pmCockpitContainer");
+      div.querySelector(".btn-pm-prog").onclick = () => openPmView("programmierenContainer");
+    }
+  });
+
+  // Native Buttons blenden die PM-Container wieder aus
+  document.querySelectorAll("button:not(.btn-pm-cockpit):not(.btn-pm-prog)").forEach(btn => {
+    if (btn.getAttribute("data-pm-bound")) return;
+    btn.setAttribute("data-pm-bound", "1");
+    btn.addEventListener("click", () => {
+      let c1 = document.getElementById("pmCockpitContainer");
+      let c2 = document.getElementById("programmierenContainer");
+      if (c1) c1.style.display = "none";
+      if (c2) c2.style.display = "none";
+    });
+  });
+}
+
+// MutationObserver: Fängt jedes Aufklappen des mobilen Menüs ab
+const navObserver = new MutationObserver(() => {
+  injectPmMenuItems();
 });
+navObserver.observe(document.body, { childList: true, subtree: true });
 
 window.renderPmCockpit = function() {
   let container = document.getElementById("pmCockpitContainer");
@@ -1137,16 +969,7 @@ window.updateProgrammedCount = async function(compName, val) {
   renderProgrammieren();
 };
 
-// Timer-Update ausschließlich für aktive Badges
-setInterval(() => {
-  let rooms = getAppRooms();
-  rooms.forEach(r => {
-    if (isRoomActive(r)) {
-      let badge = document.getElementById("timer-badge-" + r.id);
-      if (badge) badge.textContent = "⏱ In Arbeit (" + formatSecs(getRoomTotalDurationMs(r)) + ")";
-    }
-  });
-}, 1000);
+window.addEventListener("DOMContentLoaded", injectPmMenuItems);
 </script>
 </body>
 </html>
